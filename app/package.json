@@ -1,0 +1,17 @@
+{
+  "name": "keuangan-kuang-hang",
+  "version": "1.0.0",
+  "description": "Aplikasi laporan keuangan Kuang Hang Fo Thang",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test \"test/**/*.test.js\"",
+    "import-folder": "node scripts/import-folder.js",
+    "create-admin": "node scripts/create-admin.js"
+  },
+  "type": "commonjs",
+  "dependencies": {
+    "exceljs": "^4.4.0"
+  },
+  "private": true
+}

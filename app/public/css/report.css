@@ -1,0 +1,30 @@
+/* Laporan bulanan (Bentuk Laporan Keuangan), siap dicetak ke PDF: satu pos per halaman A4. */
+.report-paper { background: #fff; max-width: 800px; margin: 0 auto; border: 1px solid var(--line); box-shadow: var(--shadow); }
+.report-page { padding: 40px 52px; border-bottom: 1px dashed var(--line); }
+.report-page:last-child { border-bottom: 0; }
+.report-head { display: flex; align-items: center; gap: 16px; padding-bottom: 12px; margin-bottom: 18px; border-bottom: 2px solid var(--red); }
+.report-head img { width: 64px; height: 64px; object-fit: contain; }
+.report-head .org { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.report-title { font-weight: 700; font-size: 16px; }
+.report-period { font-weight: 600; }
+
+.report-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.report-table td { padding: 3px 4px; }
+.report-table col.c-amount { width: 150px; }
+.report-table col.c-sign { width: 22px; }
+.report-table col.c-total { width: 170px; }
+.report-table .item td:first-child { padding-left: 30px; }
+.report-table .strong td { font-weight: 700; }
+.report-table .section td { font-weight: 700; padding-top: 12px; }
+.report-table .underline-amount td.amount { border-bottom: 1px solid #333; }
+.report-table .underline-total td.total { border-bottom: 1px solid #333; }
+.report-table .sign { text-align: center; color: var(--muted); }
+.report-donors { margin-top: 22px; }
+
+
+@media print {
+  @page { size: A4; margin: 14mm; }
+  .report-paper { border: 0; box-shadow: none; max-width: none; }
+  .report-page { padding: 0; border: 0; page-break-after: always; }
+  .report-page:last-child { page-break-after: auto; }
+}

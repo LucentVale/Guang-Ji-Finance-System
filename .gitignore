@@ -1,0 +1,21 @@
+# ------------------------------------------------------------------
+# DATA KEUANGAN ASLI — JANGAN PERNAH diunggah ke GitHub
+# (mutasi bank, laporan Excel/PDF berisi nama donatur, database, backup)
+# ------------------------------------------------------------------
+Bahan/
+_arsip_v1/
+app/data/
+*.db
+*.db-wal
+*.db-shm
+*.xlsx
+*.pdf
+
+# Pengaturan khusus komputer ini (lihat app/config.local.example.json)
+app/config.local.json
+
+# Komponen hasil "npm install" dan file sementara
+node_modules/
+.claude/
+*.log
+~$*

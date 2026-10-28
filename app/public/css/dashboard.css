@@ -1,0 +1,52 @@
+/* Dashboard: kartu angka (KPI), kartu grafik, dan gaya grafik SVG. */
+:root {
+  --series-1: #2a78d6;   /* Pemasukan (palet referensi data-viz, slot 1) */
+  --series-2: #eb6834;   /* Pengeluaran (slot 2) — pasangan ini lolos validasi buta warna */
+  --chart-grid: #ece8e1;
+  --chart-zero: #c9c2b6;
+  --status-good: #0b7a0b;
+  --status-bad: #b42318;
+}
+
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.kpi { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 16px; }
+.kpi-label { font-size: 12px; color: var(--muted); }
+.kpi-value { font-size: 21px; font-weight: 650; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.kpi-value.neg { color: var(--red); }
+.kpi-hint { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.status { font-weight: 600; }
+.status.good { color: var(--status-good); }
+.status.bad { color: var(--status-bad); }
+
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 14px; margin-bottom: 14px; }
+.dash-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 16px; min-width: 0; }
+.dash-card.wide { grid-column: 1 / -1; margin-bottom: 14px; }
+.dash-card header { margin-bottom: 8px; }
+.dash-card h2 { margin: 0; }
+.dash-card header p { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+
+.chart { width: 100%; height: auto; display: block; overflow: visible; }
+.chart .grid { stroke: var(--chart-grid); stroke-width: 1; }
+.chart .grid.zero { stroke: var(--chart-zero); }
+.chart .tick { fill: var(--muted); font-size: 11px; }
+.chart .cat-label { fill: var(--text); font-size: 12px; }
+.chart .value-label { fill: var(--text); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.chart .value-label.neg { fill: var(--red); }
+.chart .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .dot { stroke: var(--surface); stroke-width: 2; }
+.chart .crosshair { stroke: var(--chart-zero); stroke-width: 1; }
+.chart .hit { fill: transparent; cursor: pointer; }
+.chart .hit:hover { fill: rgba(42, 120, 214, .06); }
+
+.chart-legend { display: flex; gap: 16px; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.chart-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.chart-tip { position: fixed; z-index: 70; pointer-events: none; background: #1d1a17; color: #fff; border-radius: 7px; padding: 7px 10px; font-size: 12px; line-height: 1.5; box-shadow: var(--shadow); font-variant-numeric: tabular-nums; }
+.sparkline path { fill: none; stroke: var(--series-1); stroke-width: 1.5; stroke-linejoin: round; }
+
+.donor-list { margin: 0; padding: 0; list-style: none; counter-reset: donor; }
+.donor-list li { display: flex; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.donor-list li::before { counter-increment: donor; content: counter(donor) "."; width: 22px; color: var(--muted); }
+.donor-list li > span:first-child { flex: 1; }
+
+@media (max-width: 720px) { .dash-grid { grid-template-columns: 1fr; } }
+@media print { .chart-tip { display: none; } }

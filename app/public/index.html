@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sistem Keuangan Guang Ji</title>
+  <link rel="icon" type="image/png" href="img/logo-emblem.png">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/sheet.css">
+  <link rel="stylesheet" href="css/report.css">
+  <link rel="stylesheet" href="css/auth.css">
+  <link rel="stylesheet" href="css/dashboard.css">
+</head>
+<body>
+  <!-- Ditampilkan sebelum login (halaman masuk / buat Admin pertama / wajib ganti kata sandi) -->
+  <main id="authScreen" class="auth-screen" hidden></main>
+
+  <!-- Aplikasi utama, hanya tampil setelah login -->
+  <div id="appShell" hidden>
+    <header class="topbar no-print">
+      <a class="brand" href="#/dashboard">
+        <img src="img/logo-emblem.png" alt="Logo Guang Ji">
+        <span>
+          <strong>Sistem Keuangan Guang Ji</strong>
+          <small id="fothangName">—</small>
+        </span>
+      </a>
+      <div class="topbar-controls">
+        <label>Fothang <select id="fothangSelect" aria-label="Pilih Fothang"></select></label>
+        <label>Tahun <select id="yearSelect" aria-label="Pilih tahun buku"></select></label>
+        <div class="user-menu" id="userMenu"></div>
+      </div>
+    </header>
+
+    <nav class="flow no-print" id="flowNav" aria-label="Alur kerja">
+      <a href="#/dashboard" data-view="dashboard">📊 Dashboard</a>
+      <a href="#/mutasi" data-view="mutasi"><b>1</b> Mutasi Bank</a>
+      <a href="#/draf" data-view="draf"><b>2</b> Draf</a>
+      <a href="#/tahunan" data-view="tahunan"><b>3</b> Laporan per Pos</a>
+      <a href="#/cek" data-view="cek"><b>4</b> Cek Saldo</a>
+      <a href="#/laporan" data-view="laporan"><b>5</b> Laporan PDF</a>
+      <span class="flow-spacer"></span>
+      <a href="#/riwayat" data-view="riwayat">🕘 Riwayat</a>
+      <a href="#/pengguna" data-view="pengguna" data-admin data-login-only>👥 Pengguna</a>
+      <a href="#/pengaturan" data-view="pengaturan" data-admin>⚙ Pengaturan</a>
+    </nav>
+
+    <main id="view"></main>
+  </div>
+
+  <div id="modalRoot"></div>
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

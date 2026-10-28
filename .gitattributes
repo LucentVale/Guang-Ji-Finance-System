@@ -1,0 +1,6 @@
+# Akhir baris seragam (LF) untuk kode; file khusus Windows tetap CRLF.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.vbs text eol=crlf
+*.png binary
+*.ico binary
