@@ -118,6 +118,7 @@ async function route() {
   const [name, query] = location.hash.replace(/^#\/?/, '').split('?');
   const viewName = VIEWS[name] && store.can(VIEWS[name].permission) ? name : DEFAULT_VIEW;
   $$('#flowNav a').forEach((a) => a.classList.toggle('active', a.dataset.view === viewName));
+  main.className = ''; // kelas tata letak khusus (mis. view-fill) dipasang ulang oleh view yang membutuhkannya
   try {
     await VIEWS[viewName].render(main, new URLSearchParams(query || ''), { refreshApp: loadReferenceData });
   } catch (err) {

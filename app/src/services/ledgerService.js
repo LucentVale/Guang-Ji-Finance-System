@@ -13,9 +13,13 @@ module.exports = function ledgerService({ repos, services }) {
     /**
      * Sheet "Tabel": saldo akhir tahun tiap pos per akun, dibandingkan dengan saldo rekening koran.
      * Selisih = saldo bank (rekening koran) - total saldo pos di akun itu.
+     *
+     * Hanya akun yang punya PEMBANDING dari luar pembukuan yang dihitung selisihnya:
+     *   - bank: saldo baris mutasi terakhir (rekening koran)
+     *   - kas : belum ada hitungan fisik di aplikasi, jadi actual & selisih = null (bukan 0 / "cocok")
+     * Total "actual" dan "selisih" hanya menjumlah akun yang punya pembanding (null bila tidak ada sama sekali).
      */
     tabel(fothangId, year) {
-      const fothang = repos.fothang.findById(fothangId);
       const accounts = accountsOf(fothangId);
       const { to } = yearRange(year);
       const snap = services.balance.snapshot(fothangId, to);
@@ -33,7 +37,7 @@ module.exports = function ledgerService({ repos, services }) {
       const columns = accounts.map((a) => {
         const posTotal = allPos.reduce((s, p) => s + snap.of(p.id, a.id), 0) + snap.unallocated(a.id);
         const statement = a.kind === 'bank' ? repos.transaction.lastStatementBalance(a.id, to) : null;
-        const actual = statement ? statement.balance_cents : a.kind === 'cash' ? services.balance.accountBalance(a, fothang.start_date, to) : null;
+        const actual = statement ? statement.balance_cents : null;
         return {
           account_id: a.id,
           name: a.name,
@@ -43,17 +47,22 @@ module.exports = function ledgerService({ repos, services }) {
           actual: toRupiah(actual),
           actual_date: statement?.date ?? null,
           selisih: actual == null ? null : toRupiah(actual - posTotal),
+          has_comparison: actual != null,
+          actual_note: actual != null ? '' : a.kind === 'cash' ? 'belum ada hitungan fisik' : 'belum ada mutasi bank',
         };
       });
 
-      const sum = (pick) => columns.reduce((s, c) => s + Math.round((pick(c) ?? 0) * 100), 0);
+      const compared = columns.filter((c) => c.has_comparison);
+      const sum = (list, pick) => list.reduce((s, c) => s + Math.round(pick(c) * 100), 0);
       return {
         year,
         accounts: columns,
         rows,
-        total: toRupiah(sum((c) => c.total)),
-        actual: toRupiah(sum((c) => c.actual)),
-        selisih: toRupiah(sum((c) => c.selisih)),
+        total: toRupiah(sum(columns, (c) => c.total)),
+        actual: compared.length ? toRupiah(sum(compared, (c) => c.actual)) : null,
+        selisih: compared.length ? toRupiah(sum(compared, (c) => c.selisih)) : null,
+        // Total saldo pos di akun-akun yang punya pembanding (dasar perhitungan "selisih" total).
+        compared_total: toRupiah(sum(compared, (c) => c.total)),
       };
     },
 
@@ -61,6 +70,11 @@ module.exports = function ledgerService({ repos, services }) {
      * Sheet per pos (seperti sheet "1" = CU THAN): baris per transaksi dikelompokkan per bulan,
      * dengan kolom Masuk/Keluar/Saldo untuk setiap akun (BCA, Kas Kecil, ...).
      * Akun yang tidak pernah dipakai pos ini disembunyikan.
+     *
+     * Ringkasan (semua baris sheet, termasuk pindahan antar pos, supaya cocok dengan saldo berjalan):
+     *   total_opening / total_in / total_out / total_closing  — seluruh akun
+     *   accounts[i].total_in / total_out                         — per akun
+     *   months[i].subtotal = { masuk, keluar, accounts: [{ id, masuk, keluar, closing }] } — per bulan
      */
     posSheet(fothangId, posId, year) {
       const pos = assertOwned(repos.pos.findById(Number(posId)), fothangId, 'Pos');
@@ -75,20 +89,57 @@ module.exports = function ledgerService({ repos, services }) {
 
       const running = new Map(accounts.map((a) => [a.id, opening.of(pos.id, a.id)]));
       const lookup = { accounts: new Map(allAccounts.map((a) => [a.id, a])) };
+      // Jumlah masuk/keluar dalam sen: per akun untuk setahun, dan per akun untuk bulan yang sedang dibaca.
+      const zero = () => new Map(accounts.map((a) => [a.id, { in: 0, out: 0 }]));
+      const yearFlow = zero();
       const months = [];
+      let monthFlow = null;
+
+      const closeMonth = () => {
+        const m = months.at(-1);
+        if (!m) return;
+        const perAccount = accounts.map((a) => ({
+          id: a.id,
+          masuk: toRupiah(monthFlow.get(a.id).in),
+          keluar: toRupiah(monthFlow.get(a.id).out),
+          closing: toRupiah(running.get(a.id)),
+        }));
+        const sumOf = (key) => toRupiah([...monthFlow.values()].reduce((s, f) => s + f[key], 0));
+        m.subtotal = { masuk: sumOf('in'), keluar: sumOf('out'), accounts: perAccount };
+      };
+
       for (const r of rows) {
         const m = monthOf(r.date);
-        if (months.at(-1)?.month !== m) months.push({ month: m, rows: [] });
+        if (months.at(-1)?.month !== m) {
+          closeMonth();
+          months.push({ month: m, rows: [] });
+          monthFlow = zero();
+        }
         running.set(r.account_id, running.get(r.account_id) + r.amount_cents);
+        const key = r.amount_cents > 0 ? 'in' : 'out';
+        monthFlow.get(r.account_id)[key] += Math.abs(r.amount_cents);
+        yearFlow.get(r.account_id)[key] += Math.abs(r.amount_cents);
         months.at(-1).rows.push({ ...present.transaction(r, lookup), saldo: toRupiah(running.get(r.account_id)) });
       }
+      closeMonth();
 
+      const sumCents = (values) => [...values].reduce((s, v) => s + v, 0);
       return {
         pos: { id: pos.id, number: pos.number, code: pos.code, name: pos.name },
         year,
-        accounts: accounts.map((a) => ({ id: a.id, name: a.name, opening: toRupiah(opening.of(pos.id, a.id)), closing: toRupiah(running.get(a.id)) })),
+        accounts: accounts.map((a) => ({
+          id: a.id,
+          name: a.name,
+          opening: toRupiah(opening.of(pos.id, a.id)),
+          closing: toRupiah(running.get(a.id)),
+          total_in: toRupiah(yearFlow.get(a.id).in),
+          total_out: toRupiah(yearFlow.get(a.id).out),
+        })),
         months,
-        total_closing: toRupiah([...running.values()].reduce((s, v) => s + v, 0)),
+        total_opening: toRupiah(sumCents(accounts.map((a) => opening.of(pos.id, a.id)))),
+        total_in: toRupiah(sumCents([...yearFlow.values()].map((f) => f.in))),
+        total_out: toRupiah(sumCents([...yearFlow.values()].map((f) => f.out))),
+        total_closing: toRupiah(sumCents(running.values())),
       };
     },
 

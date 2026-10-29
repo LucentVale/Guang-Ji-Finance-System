@@ -7,6 +7,17 @@ const numberFormat = new Intl.NumberFormat('id-ID', { minimumFractionDigits: 2, 
 /** 1234567.5 -> "1.234.567,50"; kosong untuk null. */
 export const money = (n) => (n == null ? '' : numberFormat.format(n));
 
+const wholeFormat = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
+
+/**
+ * Seperti money(), tetapi ",00" dihilangkan bila tidak ada sen: 200000 -> "200.000", 118112.78 -> "118.112,78".
+ * Dipakai di tabel yang padat (Laporan per Pos). money() tetap dipakai halaman lain.
+ */
+export function amount(n) {
+  if (n == null) return '';
+  return Math.round(n * 100) % 100 === 0 ? wholeFormat.format(Math.round(n)) : numberFormat.format(n);
+}
+
 /** "Rp 1.234.567,50" / "-Rp 1.234.567,50". */
 export const rupiah = (n) => (n == null ? '–' : `${n < 0 ? '-' : ''}Rp ${numberFormat.format(Math.abs(n))}`);
 

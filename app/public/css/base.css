@@ -102,3 +102,11 @@ label.check { flex-direction: row; align-items: center; gap: 7px; color: var(--t
 .toast.error { background: var(--red); }
 
 @media (max-width: 720px) { .form-grid { grid-template-columns: 1fr; } }
+
+/* Daftar rincian (label : nilai), mis. rincian transaksi read-only. */
+.detail-list { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 0 14px; }
+.detail-list dt { color: var(--muted); font-size: 12px; padding-top: 2px; }
+.detail-list dd { margin: 0; word-break: break-word; }
+
+/* Teks hanya untuk pembaca layar. */
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

@@ -41,6 +41,9 @@ body:has(#appShell:not([hidden])) { background: var(--ink); }
 .pill-select select { border: 0; padding: 5px 6px; background: transparent; font-weight: 600; color: var(--text); }
 
 main { padding: 0; }
+/* Halaman yang mengisi tinggi layar (Laporan per Pos): panel kerja = tinggi jendela, isi mengisi sisanya. */
+.workspace:has(> main.view-fill) { display: flex; flex-direction: column; height: calc(100vh - 24px); padding-bottom: 16px; }
+main.view-fill { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .view-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 16px; }
 .view-head h1 { font-size: 24px; letter-spacing: -.01em; }
 .view-head .sub { color: var(--muted); margin: 4px 0 0; max-width: 760px; }

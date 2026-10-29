@@ -1,8 +1,8 @@
-// Form transaksi (baru / ubah) dan form pindahan antar pos.
+// Form transaksi (baru / ubah), rincian read-only, pecah transaksi, dan form pindahan antar pos.
 import { $, $$, html } from '../core/dom.js';
 import { api } from '../core/api.js';
 import { store } from '../core/store.js';
-import { money, parseAmount, todayIso } from '../core/format.js';
+import { money, parseAmount, todayIso, dateId } from '../core/format.js';
 import { openModal, attempt } from './feedback.js';
 import { posOptions, accountOptions } from './options.js';
 
@@ -14,6 +14,32 @@ const SOURCE_NOTES = {
 function defaultDate() {
   const today = todayIso();
   return today.startsWith(String(store.year)) ? today : `${store.year}-01-01`;
+}
+
+const SOURCE_LABEL = { mutasi: 'Mutasi bank', draf: 'File DRAF', manual: 'Input manual', pindahan: 'Pindahan antar pos' };
+
+/** Rincian satu transaksi tanpa bisa diubah — untuk pengguna yang hanya boleh melihat (Pimpinan). */
+export function openTransactionDetail(tx) {
+  const row = (label, value) => (value ? html`<dt>${label}</dt><dd>${value}</dd>` : '');
+  openModal({
+    title: 'Rincian Transaksi',
+    body: html`
+      <dl class="detail-list">
+        ${row('Tanggal', dateId(tx.date))}
+        ${row('Pos', store.posById(tx.pos_id)?.name ?? 'Belum dialokasikan')}
+        ${row('Akun', store.accountById(tx.account_id)?.name)}
+        ${row('Kategori', tx.category)}
+        ${row('Nama / uraian', tx.name)}
+        ${row(tx.masuk ? 'Masuk' : 'Keluar', `Rp ${money(tx.masuk || tx.keluar)}`)}
+        ${row('No. Kwitansi', tx.receipt_no)}
+        ${row('Piao Wen', tx.piao_wen)}
+        ${row('Keterangan', tx.note)}
+        ${row('Sumber', SOURCE_LABEL[tx.source] || tx.source)}
+        ${row('Kode mutasi', tx.bank_code)}
+      </dl>
+      <p class="muted" style="margin:0;font-size:12px">Anda hanya punya akses melihat. Perubahan data dilakukan oleh Bendahara atau Admin.</p>`,
+    footer: html`<div></div><button data-close>Tutup</button>`,
+  });
 }
 
 /**

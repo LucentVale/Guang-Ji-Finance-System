@@ -161,3 +161,57 @@ test('dashboard: total cocok dengan per pos, pindahan tidak dihitung sebagai mas
   assert.deepEqual(cu.recent.map((r) => [r.date, r.name, r.amount]), [['2026-01-05', 'IURAN MABGI', -200], ['2026-01-02', 'SAHABAT SEJATI', 300]]);
   assert.equal(o.recent.length, 3, 'pindahan (2 baris) tidak ikut di transaksi terbaru');
 });
+
+test('tabel: akun kas tanpa hitungan fisik tidak dianggap "cocok", total selisih hanya dari akun berpembanding', async () => {
+  const { ctx } = createTestContext();
+  const f = ctx.services.fothang.create({
+    code: 'KAS', name: 'Kas Fo Thang', start_date: '2026-01-01',
+    accounts: [{ name: 'BCA', kind: 'bank', opening: 1000 }, { name: 'Kas Kecil', kind: 'cash', opening: 0 }],
+  });
+  const [bca, kas] = ctx.repos.account.listByFothang(f.id);
+  const pos = ctx.services.pos.create(f.id, { number: 1, code: 'CU THAN', name: 'Cu Than', openings: { [bca.id]: 1000 } });
+
+  // Tanpa mutasi bank sama sekali: tidak ada pembanding apa pun.
+  let t = ctx.services.ledger.tabel(f.id, 2026);
+  assert.deepEqual(t.accounts.map((a) => [a.name, a.actual, a.selisih, a.has_comparison, a.actual_note]),
+    [['BCA', null, null, false, 'belum ada mutasi bank'], ['Kas Kecil', null, null, false, 'belum ada hitungan fisik']]);
+  assert.equal(t.selisih, null);
+  assert.equal(t.actual, null);
+
+  // Mutasi bank ada (selisih BCA bisa dihitung) + transaksi kas: kas tetap tanpa pembanding.
+  const up = await ctx.services.imports.upload(f.id, await makeMutasiFile([['02/01', 'TRSF E-BANKING CR', 'CU THAN ; A', '300.00 CR', '1,300.00']]), 'Mutasi Januari 2026.xlsx');
+  ctx.services.imports.commit(f.id, { token: up.token, sheet: 'Jan 26', year: 2026, account_id: bca.id });
+  ctx.services.transaction.create(f.id, { date: '2026-01-03', account_id: kas.id, pos_id: pos, name: 'Kas masuk', masuk: 50 });
+  t = ctx.services.ledger.tabel(f.id, 2026);
+  const [tBca, tKas] = t.accounts;
+  assert.deepEqual([tBca.actual, tBca.selisih, tBca.has_comparison], [1300, 0, true]);
+  assert.deepEqual([tKas.total, tKas.actual, tKas.selisih, tKas.has_comparison], [50, null, null, false]);
+  assert.equal(t.total, 1350, 'total saldo pos tetap memuat kas');
+  assert.equal(t.actual, 1300, 'saldo pembanding hanya dari bank');
+  assert.equal(t.selisih, 0, 'selisih total hanya dari akun yang punya pembanding');
+  assert.equal(t.compared_total, 1300);
+});
+
+test('sheet pos: subtotal per bulan cocok dengan total tahunan dan saldo akhir', async () => {
+  const t = createTestContext();
+  const { request } = await importJanuary(t);
+  t.ctx.services.imports.commit(t.fothangId, request);
+  t.ctx.services.transaction.create(t.fothangId, { date: '2026-02-03', account_id: t.bcaId, pos_id: t.cuThanId, name: 'Donasi Feb', masuk: 75.5 });
+  t.ctx.services.transaction.create(t.fothangId, { date: '2026-02-10', account_id: t.bcaId, pos_id: t.cuThanId, name: 'Bayar listrik', keluar: 40 });
+  t.ctx.services.transaction.transfer(t.fothangId, { date: '2026-03-01', account_id: t.bcaId, from_pos_id: t.cuThanId, to_pos_id: t.kfccId, amount: 10 });
+
+  const s = t.ctx.services.ledger.posSheet(t.fothangId, t.cuThanId, 2026);
+  const cents = (n) => Math.round(n * 100);
+  const sum = (pick) => s.months.reduce((acc, m) => acc + cents(pick(m)), 0) / 100;
+
+  assert.deepEqual(s.months.map((m) => [m.month, m.subtotal.masuk, m.subtotal.keluar]), [[1, 300, 200], [2, 75.5, 40], [3, 0, 10]]);
+  assert.equal(sum((m) => m.subtotal.masuk), s.total_in);
+  assert.equal(sum((m) => m.subtotal.keluar), s.total_out);
+  assert.deepEqual([s.total_opening, s.total_in, s.total_out, s.total_closing], [600, 375.5, 250, 725.5]);
+  assert.equal(s.total_opening + s.total_in - s.total_out, s.total_closing);
+
+  // Saldo akhir bulan = saldo berjalan baris terakhir bulan itu; bulan terakhir = saldo akhir tahun.
+  for (const m of s.months) assert.equal(m.subtotal.accounts[0].closing, m.rows.at(-1).saldo);
+  assert.equal(s.months.at(-1).subtotal.accounts[0].closing, s.accounts[0].closing);
+  assert.deepEqual([s.accounts[0].total_in, s.accounts[0].total_out], [375.5, 250]);
+});

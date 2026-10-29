@@ -1,5 +1,4 @@
-// Tampilan laporan: Tabel, sheet per pos, Draf, Cek Saldo, Laporan Bulanan, dan sheet Barang.
-const { reply } = require('../respond');
+// Tampilan laporan: Tabel, sheet per pos, Draf, Cek Saldo, Laporan Bulanan, dan Dashboard.
 const { assertYear, assertMonth } = require('../../lib/period');
 
 module.exports = function register(router, { services }) {
@@ -16,9 +15,4 @@ module.exports = function register(router, { services }) {
 
   router.get(`${base}/dashboard`, ({ params, query }) => services.dashboard.overview(params.fothangId, assertYear(query.year)));
   router.get(`${base}/dashboard/pos/:posId`, ({ params, query }) => services.dashboard.pos(params.fothangId, params.posId, assertYear(query.year)));
-
-  router.get(`${base}/barang`, ({ params, query }) => services.goods.list(params.fothangId, assertYear(query.year)));
-  router.post(`${base}/barang`, ({ params, body }) => reply.created({ id: services.goods.create(params.fothangId, body) }), { audit: 'Menambah donasi barang' });
-  router.put(`${base}/barang/:id`, ({ params, body }) => { services.goods.update(params.fothangId, params.id, body); }, { audit: 'Mengubah donasi barang' });
-  router.delete(`${base}/barang/:id`, ({ params }) => { services.goods.remove(params.fothangId, params.id); }, { audit: 'Menghapus donasi barang' });
 };

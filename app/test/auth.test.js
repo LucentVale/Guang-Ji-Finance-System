@@ -121,7 +121,8 @@ test('alur keamanan lengkap', async (t) => {
   });
 
   await t.test('permintaan dari situs lain ditolak', async () => {
-    const res = await admin('POST', `/api/fothang/${f1.id}/barang`, { date: '2026-01-01', name: 'A', item: 'B' }, { Origin: 'https://situs-jahat.example' });
+    const bca = ctx.repos.account.listByFothang(f1.id)[0];
+    const res = await admin('POST', `/api/fothang/${f1.id}/transactions`, { date: '2026-01-01', account_id: bca.id, name: 'A', masuk: 1 }, { Origin: 'https://situs-jahat.example' });
     assert.equal(res.status, 403);
   });
 
@@ -151,14 +152,15 @@ test('alur keamanan lengkap', async (t) => {
 });
 
 test('mode tanpa login: hanya dari komputer ini, dan tidak bisa dipakai di server online', async () => {
-  const { f1, client } = await startApp({ loginRequired: false });
+  const { ctx: appCtx, f1, client } = await startApp({ loginRequired: false });
   const local = client();
 
   const status = (await local('GET', '/api/auth/status')).data;
   assert.equal(status.login_required, false);
   assert.equal(status.setup_needed, false);
   assert.equal((await local('GET', `/api/fothang/${f1.id}/tabel?year=2026`)).status, 200);
-  assert.equal((await local('POST', `/api/fothang/${f1.id}/barang`, { date: '2026-01-01', name: 'A', item: 'B' })).status, 201);
+  const bca = appCtx.repos.account.listByFothang(f1.id)[0];
+  assert.equal((await local('POST', `/api/fothang/${f1.id}/transactions`, { date: '2026-01-01', account_id: bca.id, name: 'A', masuk: 1 })).status, 201);
 
   // Permintaan yang diteruskan proxy (dari internet) ditolak.
   const proxied = await local('GET', `/api/fothang/${f1.id}/tabel?year=2026`, null, { 'X-Forwarded-For': '203.0.113.9' });

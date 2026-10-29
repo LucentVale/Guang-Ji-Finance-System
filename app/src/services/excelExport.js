@@ -1,5 +1,5 @@
 // Ekspor ke Excel dengan tata letak yang sama seperti file kerja manual:
-//   - Laporan Keuangan Tahunan  (sheet Tabel, Barang, lalu satu sheet per pos)
+//   - Laporan Keuangan Tahunan  (sheet Tabel, lalu satu sheet per pos)
 //   - Draf Laporan Keuangan      (satu sheet per bulan, urutan rekening koran)
 //   - Laporan Bulanan            (Bentuk Laporan Keuangan, satu sheet per bulan)
 const ExcelJS = require('exceljs');
@@ -95,15 +95,6 @@ module.exports = function excelExport({ repos, services }) {
     }
   }
 
-  function addBarangSheet(wb, fothangId, year, fothang) {
-    const ws = wb.addWorksheet('Barang');
-    ws.columns = [{ width: 12 }, { width: 36 }, { width: 36 }, { width: 30 }];
-    writeTitle(ws, 4, fothang.name, `Donatur Barang ${year}`);
-    const header = ws.addRow(['Tgl', 'Nama', 'Barang', 'Keterangan']);
-    header.eachCell((c) => { c.font = BOLD; c.fill = HEADER_FILL; c.border = BOX; });
-    for (const g of services.goods.list(fothangId, year)) ws.addRow([g.date.split('-').reverse().join('/'), g.name, g.item, g.note]);
-  }
-
   function addPosSheet(wb, fothangId, pos, year, fothang) {
     const sheet = services.ledger.posSheet(fothangId, pos.id, year);
     const n = sheet.accounts.length;
@@ -142,7 +133,6 @@ module.exports = function excelExport({ repos, services }) {
       const fothang = repos.fothang.findById(fothangId);
       const wb = newWorkbook();
       addTabelSheet(wb, fothangId, year);
-      addBarangSheet(wb, fothangId, year, fothang);
       for (const pos of services.pos.list(fothangId)) addPosSheet(wb, fothangId, pos, year, fothang);
       return Buffer.from(await wb.xlsx.writeBuffer());
     },

@@ -1,7 +1,7 @@
 // Aturan hak akses. Satu-satunya tempat yang menentukan peran mana boleh melakukan apa.
 //
 //   read  : melihat data & laporan                       -> admin, bendahara, pimpinan
-//   write : impor mutasi, input/ubah transaksi, barang   -> admin, bendahara
+//   write : impor mutasi, input/ubah transaksi          -> admin, bendahara
 //   admin : pengaturan Fothang/akun/pos, pengguna, backup -> admin
 //
 // Selain peran, pengguna non-admin hanya boleh mengakses Fothang yang ditugaskan kepadanya.
