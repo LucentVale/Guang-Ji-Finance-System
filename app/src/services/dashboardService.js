@@ -8,10 +8,11 @@ const { toRupiah } = require('../lib/money');
 const { yearRange, monthOf } = require('../lib/period');
 const { titleCase } = require('../lib/text');
 const { CATEGORY_DONATUR } = require('./classifier');
-const { reportLabel } = require('./presenters');
+const { sheetName } = require('./presenters');
 const { assertOwned } = require('./guards');
 
 const TOP_N = 8;
+const RECENT_LIMIT = 9;
 
 /** Kelompokkan nominal per label, urut terbesar; sisanya digabung jadi "Lainnya". */
 function topGroups(rows, labelOf, limit = TOP_N) {
@@ -36,6 +37,23 @@ const isOut = (t) => t.amount_cents < 0 && !isTransfer(t);
 const sum = (rows) => rows.reduce((s, t) => s + t.amount_cents, 0);
 /** Total pengeluaran sebagai angka positif (rupiah). */
 const outflow = (rows) => toRupiah(Math.abs(sum(rows.filter(isOut))));
+
+/** Transaksi terbaru (tanpa pindahan antar pos), terbaru di atas. */
+function recentTransactions(rows, posById) {
+  return rows
+    .filter((t) => !isTransfer(t))
+    .sort((a, b) => (b.date === a.date ? b.seq - a.seq || b.id - a.id : b.date < a.date ? -1 : 1))
+    .slice(0, RECENT_LIMIT)
+    .map((t) => ({
+      id: t.id,
+      date: t.date,
+      pos: posById.get(t.pos_id)?.code ?? '',
+      pos_name: posById.get(t.pos_id)?.name ?? 'Belum dialokasikan',
+      name: sheetName(t),
+      category: t.category,
+      amount: toRupiah(t.amount_cents),
+    }));
+}
 
 /**
  * 10 donatur terbesar, hanya dari pos yang memakai Daftar Donatur (mis. CU THAN) —
@@ -126,8 +144,7 @@ module.exports = function dashboardService({ repos, services }) {
         },
         months: monthlyFlows(rows, monthlyClosing(totalOpening, rows, lastMonth)),
         pos,
-        income: topGroups(rows.filter(isIn), reportLabel),
-        expense: topGroups(rows.filter(isOut), reportLabel),
+        recent: recentTransactions(rows, new Map(allPos.map((x) => [x.id, x]))),
         donors: topDonors(rows, new Set(allPos.filter((p) => p.show_donors).map((p) => p.id))),
       };
     },
@@ -153,8 +170,7 @@ module.exports = function dashboardService({ repos, services }) {
         closing: toRupiah(openingCents + sum(rows)),
         count: rows.length,
         months: monthlyFlows(rows, monthlyClosing(openingCents, rows, Math.max(lastMonth, 1))),
-        income: topGroups(rows.filter(isIn), reportLabel),
-        expense: topGroups(rows.filter(isOut), reportLabel),
+        recent: recentTransactions(rows, new Map([[p.id, p]])),
         donors: p.show_donors ? topDonors(rows, new Set([p.id])) : [],
       };
     },

@@ -89,7 +89,7 @@ async function loadReferenceData() {
 
 function renderHeader() {
   const f = store.fothang;
-  $('#fothangName').textContent = f ? `Yayasan Guang Ji · ${f.name}` : '—';
+  $('#fothangName').textContent = f ? f.name : '—';
   render($('#fothangSelect'), store.fothangList.map((x) => html`<option value="${x.id}" ${x.id === store.fothangId ? 'selected' : ''}>${x.short_name}</option>`));
 
   const startYear = Number((f?.start_date || String(store.year)).slice(0, 4));

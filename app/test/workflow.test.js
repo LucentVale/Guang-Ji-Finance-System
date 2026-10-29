@@ -158,5 +158,6 @@ test('dashboard: total cocok dengan per pos, pindahan tidak dihitung sebagai mas
 
   const cu = t.ctx.services.dashboard.pos(t.fothangId, t.cuThanId, 2026);
   assert.deepEqual([cu.opening, cu.masuk, cu.keluar, cu.pindahan, cu.closing], [600, 300, 200, -100, 600]);
-  assert.deepEqual(cu.income, [{ label: 'Donatur', amount: 300, count: 1 }]);
+  assert.deepEqual(cu.recent.map((r) => [r.date, r.name, r.amount]), [['2026-01-05', 'IURAN MABGI', -200], ['2026-01-02', 'SAHABAT SEJATI', 300]]);
+  assert.equal(o.recent.length, 3, 'pindahan (2 baris) tidak ikut di transaksi terbaru');
 });

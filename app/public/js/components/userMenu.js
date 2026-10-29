@@ -1,19 +1,25 @@
-// Menu pengguna di header: nama, peran, ganti kata sandi, keluar.
+// Kartu pengguna di bawah sidebar: inisial, nama, peran, ganti kata sandi, keluar.
 import { $, html, render } from '../core/dom.js';
 import { api } from '../core/api.js';
 import { store } from '../core/store.js';
 import { openModal, attempt } from './feedback.js';
 
+const initial = (name) => String(name || '?').trim().charAt(0).toUpperCase();
+
 export function renderUserMenu(el, { onSignedOut }) {
   const u = store.user;
   if (!store.loginRequired) {
-    render(el, html`<span class="badge badge-warn" title="Login dimatikan di app/config.local.json. Hanya bisa dibuka dari komputer ini.">Mode tanpa login</span>`);
+    render(el, html`
+      <span class="avatar" aria-hidden="true">${initial(u.full_name)}</span>
+      <span class="who" title="Login dimatikan di app/config.local.json. Hanya bisa dibuka dari komputer ini.">
+        <strong>${u.full_name}</strong><small>Mode tanpa login</small></span>`);
     return;
   }
   render(el, html`
+    <span class="avatar" aria-hidden="true">${initial(u.full_name)}</span>
     <span class="who"><strong>${u.full_name}</strong><small>${u.role_label}</small></span>
-    <button class="btn-small" data-act="password" title="Ganti kata sandi">🔑</button>
-    <button class="btn-small" data-act="logout">Keluar</button>`);
+    <button data-act="password" title="Ganti kata sandi" aria-label="Ganti kata sandi">🔑</button>
+    <button data-act="logout" title="Keluar">Keluar</button>`);
   $('[data-act="password"]', el).addEventListener('click', openChangePassword);
   $('[data-act="logout"]', el).addEventListener('click', async () => {
     await api.auth.logout().catch(() => {});

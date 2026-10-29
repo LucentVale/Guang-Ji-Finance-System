@@ -1,10 +1,10 @@
 /* Halaman masuk, menu pengguna, dan penyembunyian tombol sesuai peran. */
 .auth-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px 16px;
-  background: radial-gradient(circle at 50% 0%, var(--gold-soft), var(--bg) 60%); }
-.auth-card { width: min(400px, 100%); background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--red);
-  border-radius: 12px; box-shadow: 0 10px 30px rgba(60, 30, 10, .12); padding: 28px; }
+  background: radial-gradient(circle at 50% 0%, var(--accent-soft), var(--bg) 60%); }
+.auth-card { width: min(400px, 100%); background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--accent);
+  border-radius: 22px; box-shadow: 0 10px 30px rgba(60, 30, 10, .12); padding: 28px; }
 .auth-card .logo { display: block; width: 84px; height: 84px; margin: 0 auto 10px; }
-.auth-card h1 { text-align: center; color: var(--red-dark); font-size: 19px; }
+.auth-card h1 { text-align: center; color: var(--ink); font-size: 19px; }
 .auth-card .sub { text-align: center; color: var(--muted); margin: 4px 0 20px; }
 .auth-card form { display: flex; flex-direction: column; gap: 12px; }
 .auth-card button[type="submit"] { justify-content: center; padding: 10px; }

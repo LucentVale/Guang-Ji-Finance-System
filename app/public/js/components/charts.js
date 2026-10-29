@@ -1,14 +1,20 @@
 // Grafik SVG sederhana untuk Dashboard (tanpa library luar).
-// Aturan tampilan (lihat panduan data-viz): batang <= 24px dengan ujung membulat 4px dan pangkal rata,
-// celah 2px antar batang yang bersentuhan, garis 2px, grid tipis & samar, teks memakai warna teks (bukan warna seri),
-// legenda untuk >= 2 seri, dan tooltip saat kursor diarahkan.
+// Aturan tampilan (lihat panduan data-viz): ujung batang membulat 4px dengan pangkal rata, garis 2px,
+// grid tipis & samar, teks memakai warna teks (bukan warna seri), satu seri per grafik, dan tooltip saat kursor diarahkan.
+// Batang horizontal maksimal 24px; batang "mini" di kartu ringkasan sengaja lebih lebar mengikuti desain referensi.
 import { html, raw, escapeHtml } from '../core/dom.js';
 import { money, MONTHS } from '../core/format.js';
 
-export const SERIES = { masuk: 'var(--series-1)', keluar: 'var(--series-2)' };
+// Warna mengikuti tema oranye logo (lihat css/base.css). Satu seri per grafik, jadi tidak perlu palet kategori.
+export const COLORS = {
+  accent: 'var(--accent)',               // batang utama
+  accentLine: 'var(--accent-strong)',    // garis 2px (lebih gelap agar kontras dengan latar putih)
+  accentMuted: 'var(--accent-tint)',     // batang yang tidak disorot
+  ink: 'var(--ink-2)',                   // sorotan gelap (kartu pengeluaran)
+  inkMuted: '#ddd5cb',
+};
 const W = 640;
 const BAR_MAX = 24;
-const GAP = 2;
 const RADIUS = 4;
 
 /** Angka ringkas untuk sumbu: 1,2 M / 350 jt / 25 rb. */
@@ -62,41 +68,47 @@ function gridAndAxis(scale, y, left, right) {
     <text x="${left - 8}" y="${y(v) + 4}" class="tick" text-anchor="end">${escapeHtml(compact(v))}</text>`).join('');
 }
 
-const legend = (items) => html`
-  <div class="chart-legend">${items.map((i) => html`<span><i style="background:${i.color}"></i>${i.label}</span>`)}</div>`;
-
 /** Teks tooltip: baris "label: nilai" dipisah "|" (dibaca oleh attachTooltips). */
 const tip = (title, rows) => escapeHtml([title, ...rows.map(([k, v]) => `${k}: Rp ${money(v)}`)].join('|'));
 
 /**
- * Kolom berkelompok per bulan (Masuk & Keluar).
- * @param {{month:number, masuk:number, keluar:number}[]} months
+ * Grafik batang kecil per bulan untuk kartu ringkasan (seperti kartu "Total Income" di contoh desain):
+ * batang lembut, bulan terakhir yang berisi data disorot dan diberi label nilainya.
+ * @param {{month:number}[]} months data 12 bulan
+ * @param {string} field 'masuk' atau 'keluar'
+ * @param {{lastMonth:number, tone:'accent'|'ink', label:string}} options
  */
-export function monthlyFlowChart(months, { lastMonth = 12 } = {}) {
-  const H = 240;
-  const pad = { l: 64, r: 8, t: 12, b: 28 };
-  const visible = months.slice(0, Math.max(lastMonth, 1));
-  const scale = niceScale(0, Math.max(...visible.flatMap((m) => [m.masuk, m.keluar]), 0));
-  const y = (v) => pad.t + (H - pad.t - pad.b) * (1 - (v - scale.lo) / (scale.hi - scale.lo));
-  const band = (W - pad.l - pad.r) / visible.length;
-  const bw = Math.min(BAR_MAX, (band * 0.7 - GAP) / 2);
+export function miniBarChart(months, field, { lastMonth, tone = 'accent', label }) {
+  // Kanvas sempit sendiri (bukan lebar 640) karena kartunya kecil; kalau tidak, batang & teks ikut mengecil.
+  const MW = 300;
+  const H = 170;
+  const pad = { l: 4, r: 4, t: 34, b: 24 };
+  const end = Math.max(lastMonth, 6);
+  const shown = months.slice(end - 6, end); // 6 bulan, berakhir di bulan terakhir yang berisi data
+  const max = Math.max(...shown.map((m) => m[field]), 1);
+  const band = (MW - pad.l - pad.r) / shown.length;
+  const bw = Math.min(30, band * 0.62);
+  const base = H - pad.b;
+  const y = (v) => pad.t + (base - pad.t) * (1 - v / max);
+  const [soft, strong] = tone === 'ink' ? [COLORS.inkMuted, COLORS.ink] : [COLORS.accentMuted, COLORS.accent];
 
   let marks = '';
-  visible.forEach((m, i) => {
-    const cx = pad.l + band * i + band / 2;
-    marks += `<path d="${columnPath(cx - bw - GAP / 2, bw, y(0), y(m.masuk))}" fill="${SERIES.masuk}"/>`;
-    marks += `<path d="${columnPath(cx + GAP / 2, bw, y(0), y(m.keluar))}" fill="${SERIES.keluar}"/>`;
-    marks += `<text x="${cx}" y="${H - 8}" class="tick" text-anchor="middle">${MONTHS[m.month - 1].slice(0, 3)}</text>`;
-    // Area sentuh selebar satu bulan, lebih besar dari batangnya.
-    marks += `<rect x="${pad.l + band * i}" y="${pad.t}" width="${band}" height="${H - pad.t - pad.b}" class="hit"
-      data-tip="${tip(`${MONTHS[m.month - 1]}`, [['Masuk', m.masuk], ['Keluar', m.keluar]])}"/>`;
+  shown.forEach((m, i) => {
+    const x = pad.l + band * i + (band - bw) / 2;
+    const v = m[field];
+    const highlight = m.month === lastMonth;
+    if (v > 0) marks += `<path d="${columnPath(x, bw, base, Math.min(y(v), base - 3))}" fill="${highlight ? strong : soft}"/>`;
+    else marks += `<rect x="${x}" y="${base - 2}" width="${bw}" height="2" rx="1" fill="${soft}"/>`;
+    if (highlight && v > 0) {
+      const text = compact(v);
+      const tw = text.length * 7 + 14;
+      marks += `<rect x="${x + bw / 2 - tw / 2}" y="${y(v) - 26}" width="${tw}" height="20" rx="10" class="value-pill"/>`;
+      marks += `<text x="${x + bw / 2}" y="${y(v) - 12}" class="value-pill-text" text-anchor="middle">${escapeHtml(text)}</text>`;
+    }
+    marks += `<text x="${x + bw / 2}" y="${H - 6}" class="tick" text-anchor="middle">${MONTHS[m.month - 1].slice(0, 3)}</text>`;
+    marks += `<rect x="${pad.l + band * i}" y="0" width="${band}" height="${H}" class="hit" data-tip="${tip(MONTHS[m.month - 1], [[label, v]])}"/>`;
   });
-
-  return html`
-    ${legend([{ label: 'Pemasukan', color: SERIES.masuk }, { label: 'Pengeluaran', color: SERIES.keluar }])}
-    <svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Pemasukan dan pengeluaran per bulan">
-      ${raw(gridAndAxis(scale, y, pad.l, W - pad.r))}${raw(marks)}
-    </svg>`;
+  return html`<svg viewBox="0 0 ${MW} ${H}" class="chart mini" role="img" aria-label="${label} per bulan">${raw(marks)}</svg>`;
 }
 
 /**
@@ -115,8 +127,9 @@ export function balanceLineChart(months, { label = 'Saldo' } = {}) {
 
   const d = points.map((m, i) => `${i ? 'L' : 'M'}${x(m.month)},${y(m.saldo)}`).join('');
   const last = points.at(-1);
-  let marks = `<path d="${d}" class="line" stroke="${SERIES.masuk}"/>`;
-  marks += `<circle cx="${x(last.month)}" cy="${y(last.saldo)}" r="5" class="dot" fill="${SERIES.masuk}"/>`;
+  const area = `${d}L${x(last.month)},${y(Math.max(scale.lo, 0))}L${x(points[0].month)},${y(Math.max(scale.lo, 0))}Z`;
+  let marks = `<path d="${area}" class="area" fill="${COLORS.accent}"/><path d="${d}" class="line" stroke="${COLORS.accentLine}"/>`;
+  marks += `<circle cx="${x(last.month)}" cy="${y(last.saldo)}" r="5" class="dot" fill="${COLORS.accent}"/>`;
   marks += `<text x="${x(last.month) + 10}" y="${y(last.saldo) + 4}" class="value-label">${escapeHtml(compact(last.saldo))}</text>`;
   months.forEach((m) => {
     marks += `<text x="${x(m.month)}" y="${H - 8}" class="tick" text-anchor="middle">${MONTHS[m.month - 1].slice(0, 3)}</text>`;
@@ -138,7 +151,7 @@ export function balanceLineChart(months, { label = 'Saldo' } = {}) {
  * Batang horizontal berurutan (satu seri), mendukung nilai negatif.
  * @param {{label:string, value:number, id?:any}[]} items
  */
-export function rankedBarChart(items, { color = SERIES.masuk, labelWidth = 170 } = {}) {
+export function rankedBarChart(items, { color = COLORS.accent, labelWidth = 170 } = {}) {
   if (!items.length) return html`<p class="muted empty">Belum ada data.</p>`;
   const rowH = 30;
   const barH = Math.min(BAR_MAX - 6, rowH - 10);
