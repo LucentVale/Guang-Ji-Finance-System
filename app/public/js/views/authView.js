@@ -4,7 +4,7 @@ import { api } from '../core/api.js';
 
 const card = (title, sub, body) => html`
   <section class="auth-card">
-    <img class="logo" src="img/logo-emblem.png" alt="Logo Guang Ji">
+    <img class="logo" src="img/logo-emblem.png" alt="Logo Yayasan Guang Ji">
     <h1>${title}</h1>
     <p class="sub">${sub}</p>
     ${body}
@@ -19,12 +19,15 @@ function handleSubmit(root, action) {
     const button = $('button[type="submit"]', form);
     button.disabled = true;
     error.hidden = true;
+    button.setAttribute('aria-busy', 'true');
     try {
       await action(Object.fromEntries(new FormData(form)));
     } catch (err) {
       error.textContent = err.message;
       error.hidden = false;
       button.disabled = false;
+      button.removeAttribute('aria-busy');
+      $('input', form)?.focus();
     }
   });
   setTimeout(() => $('input', form)?.focus(), 20);
@@ -36,7 +39,7 @@ export function showLogin(root, onSignedIn) {
     <form>
       <label>Nama pengguna<input name="username" autocomplete="username" required></label>
       <label>Kata sandi<input name="password" type="password" autocomplete="current-password" required></label>
-      <p class="error" hidden></p>
+      <p class="error" role="alert" hidden></p>
       <button type="submit" class="btn-primary">Masuk</button>
       <p class="hint">Lupa kata sandi? Hubungi Admin Yayasan untuk mengatur ulang.</p>
     </form>`));
@@ -61,7 +64,7 @@ export function showSetup(root, { allowedHere }, onSignedIn) {
       <label>Kata sandi<input name="password" type="password" required autocomplete="new-password"></label>
       <label>Ulangi kata sandi<input name="password2" type="password" required autocomplete="new-password"></label>
       <p class="hint">Minimal 8 karakter, berisi huruf dan angka.</p>
-      <p class="error" hidden></p>
+      <p class="error" role="alert" hidden></p>
       <button type="submit" class="btn-primary">Buat Akun Admin</button>
     </form>`));
   handleSubmit(root, async (data) => {
@@ -79,7 +82,7 @@ export function showForcedPasswordChange(root, user, onDone) {
       <label>Kata sandi baru<input name="next" type="password" required autocomplete="new-password"></label>
       <label>Ulangi kata sandi baru<input name="next2" type="password" required autocomplete="new-password"></label>
       <p class="hint">Minimal 8 karakter, berisi huruf dan angka.</p>
-      <p class="error" hidden></p>
+      <p class="error" role="alert" hidden></p>
       <button type="submit" class="btn-primary">Simpan Kata Sandi</button>
     </form>`));
   handleSubmit(root, async ({ current, next, next2 }) => {

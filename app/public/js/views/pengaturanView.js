@@ -31,11 +31,11 @@ export async function pengaturanView(main, params, { refreshApp }) {
             <label>Nama singkat (judul laporan)<input name="short_name" required value="${f.short_name}"></label>
             <label class="full">Nama lengkap<input name="name" required value="${f.name}"></label>
             <label>Mulai pembukuan (saldo awal)<input type="date" name="start_date" required value="${f.start_date}"></label>
-            <div style="align-self:end"><button class="btn-primary" type="submit">Simpan</button></div>
+            <div class="align-end"><button class="btn-primary" type="submit">Simpan</button></div>
           </form>
         </section>
         <section class="panel">
-          <div class="toolbar" style="justify-content:space-between;margin-bottom:8px"><h2 style="margin:0">Akun</h2><button class="btn-small" id="addAccount">+ Akun</button></div>
+          <div class="toolbar toolbar-between mb-2"><h2 class="mb-0">Akun</h2><button class="btn-small" id="addAccount">+ Akun</button></div>
           <div class="table-wrap"><table class="table">
             <thead><tr><th>Nama</th><th>Jenis</th><th>No. Rekening</th><th class="num">Saldo Awal Akun</th><th class="num">Total Saldo Awal Pos</th></tr></thead>
             <tbody>${accounts.map((a) => {
@@ -46,12 +46,12 @@ export async function pengaturanView(main, params, { refreshApp }) {
                 <td class="num ${diff ? 'neg' : 'in'}">${money(openingTotal(a.id))} ${diff ? '≠' : '✓'}</td></tr>`;
             })}</tbody>
           </table></div>
-          <p class="muted" style="font-size:12px;margin-top:8px">Saldo awal akun harus sama dengan jumlah saldo awal semua pos di akun itu (✓), supaya Tabel tidak menunjukkan selisih.</p>
+          <p class="hint mt-2">Saldo awal akun harus sama dengan jumlah saldo awal semua pos di akun itu (✓), supaya Tabel tidak menunjukkan selisih.</p>
         </section>
       </div>
 
       <section class="panel">
-        <div class="toolbar" style="justify-content:space-between;margin-bottom:8px"><h2 style="margin:0">Pos Keuangan</h2><button class="btn-small btn-primary" id="addPos">+ Pos</button></div>
+        <div class="toolbar toolbar-between mb-2"><h2 class="mb-0">Pos Keuangan</h2><button class="btn-small btn-primary" id="addPos">+ Pos</button></div>
         <div class="table-wrap"><table class="table">
           <thead><tr><th>No. Sheet</th><th>Kode</th><th>Nama</th><th>Alias kode mutasi</th>${accounts.map((a) => html`<th class="num">Saldo Awal ${a.name}</th>`)}<th>Daftar Donatur</th><th>Status</th></tr></thead>
           <tbody>${posList.map((p) => html`<tr class="clickable" data-pos="${p.id}">

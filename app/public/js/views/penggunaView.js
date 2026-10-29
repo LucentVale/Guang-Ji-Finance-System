@@ -50,9 +50,9 @@ function openUserForm(user, fothangs, onSaved) {
         <label class="full">Nama lengkap<input name="full_name" required value="${user?.full_name || ''}"></label>
         <label>Nama pengguna<input name="username" required ${isNew ? '' : 'disabled'} value="${user?.username || ''}" placeholder="mis. bendahara.kuanghang"></label>
         <label>Peran<select name="role">${Object.entries(ROLE_LABEL).map(([v, l]) => html`<option value="${v}" ${user?.role === v ? 'selected' : ''}>${l}</option>`)}</select></label>
-        <p class="full muted" id="roleHelp" style="margin:0;font-size:12px"></p>
-        <fieldset class="full" id="fothangBox" style="border:1px solid var(--line);border-radius:7px;padding:8px 12px">
-          <legend class="muted" style="font-size:12px">Fothang yang boleh dibuka</legend>
+        <p class="full hint" id="roleHelp"></p>
+        <fieldset class="full fieldset" id="fothangBox">
+          <legend>Fothang yang boleh dibuka</legend>
           ${fothangs.map((f) => html`<label class="check"><input type="checkbox" name="fothang" value="${f.id}" ${user?.fothang_ids.includes(f.id) || (isNew && fothangs.length === 1) ? 'checked' : ''}> ${f.name}</label>`)}
         </fieldset>
         ${isNew ? html`

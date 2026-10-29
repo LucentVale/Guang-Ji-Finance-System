@@ -1,70 +1,64 @@
-/* Dashboard bergaya kartu (mengikuti desain referensi) dengan warna oranye logo Guang Ji. */
-:root {
-  --chart-grid: #ece8e1;
-  --chart-zero: #c9c2b6;
-  --status-good: #0b7a0b;
-  --status-bad: #b42318;
-}
+/* Dashboard bergaya kartu (mengikuti desain referensi) dengan warna oranye logo Guang Ji. Token: css/base.css. */
 
 .status { font-weight: 600; }
-.status.good { color: var(--status-good); }
-.status.bad { color: var(--status-bad); }
-.cents { opacity: .38; }
-.neg { color: var(--red); }
+.status.good { color: var(--green-strong); }
+.status.bad { color: var(--red); }
+/* Sen dibuat lebih tipis (bukan transparan) supaya tetap terbaca: --muted = 5.7:1 di atas putih. */
+.cents { color: var(--muted); font-weight: 500; }
 
 /* ---------------------------------------------------------------- Susunan */
-.dash-top { display: grid; grid-template-columns: minmax(250px, 1fr) minmax(360px, 1.55fr) minmax(250px, 1fr); gap: 16px; margin-bottom: 16px; align-items: start; }
-.dash-top .col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; margin-bottom: 16px; }
+.dash-top { display: grid; grid-template-columns: minmax(250px, 1fr) minmax(360px, 1.55fr) minmax(250px, 1fr); gap: var(--space-4); margin-bottom: var(--space-4); align-items: start; }
+.dash-top .col { display: flex; flex-direction: column; gap: var(--space-4); min-width: 0; }
+.dash-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: var(--space-4); margin-bottom: var(--space-4); }
 
-.dcard { background: var(--surface); border-radius: 22px; box-shadow: var(--shadow); padding: 18px 20px; min-width: 0; }
+.dcard { background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 18px 20px; min-width: 0; }
 .dcard header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
-.dcard h2 { margin: 0; font-size: 16px; }
-.dcard header p { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+.dcard h2 { margin: 0; font-size: var(--fs-lg); }
+.dcard header p { margin: 2px 0 0; font-size: var(--fs-sm); color: var(--muted); }
 .card-foot { display: flex; justify-content: center; margin-top: 12px; }
 
 /* ---------------------------------------------------------------- Kartu saldo gelap */
-.hero { background: linear-gradient(160deg, #3a2f27, var(--ink) 70%); color: var(--ink-text); border-radius: 24px; padding: 18px 8px 8px; box-shadow: 0 10px 24px rgba(30, 20, 10, .18); }
+.hero { background: linear-gradient(160deg, var(--ink-3), var(--ink) 70%); color: var(--ink-text); border-radius: var(--radius-xl); padding: 18px 8px 8px; box-shadow: 0 10px 24px rgba(30, 20, 10, .18); }
 .hero-top { display: flex; justify-content: space-between; align-items: flex-start; padding: 0 12px 14px; }
-.hero h2 { margin: 0; font-size: 17px; color: #fff; }
-.hero-top p { margin: 2px 0 0; font-size: 12px; color: var(--ink-muted); }
-.hero-year { padding: 5px 12px; border-radius: 999px; background: rgba(255, 255, 255, .1); font-size: 12px; font-weight: 600; }
-.hero-inner { background: var(--surface); color: var(--text); border-radius: 18px; padding: 16px 16px 0; }
-.hero-inner .label { margin: 0; font-size: 13px; color: var(--muted); }
-.hero-amount { font-size: 30px; font-weight: 650; letter-spacing: -.02em; margin: 2px 0 4px; font-variant-numeric: tabular-nums; }
-.hero-note { font-size: 12px; margin: 0 0 12px; }
+.hero h2 { margin: 0; font-size: var(--fs-xl); color: var(--on-accent); }
+.hero-top p { margin: 2px 0 0; font-size: var(--fs-sm); color: var(--ink-muted); }
+.hero-year { padding: 5px 12px; border-radius: var(--radius-pill); background: rgba(255, 255, 255, .1); font-size: var(--fs-sm); font-weight: 600; }
+.hero-inner { background: var(--surface); color: var(--text); border-radius: var(--radius-lg); padding: 16px 16px 0; }
+.hero-inner .label { margin: 0; font-size: var(--fs-md); color: var(--muted); }
+.hero-amount { font-size: var(--fs-display); font-weight: 650; letter-spacing: -.02em; margin: 2px 0 4px; font-variant-numeric: tabular-nums; }
+.hero-note { font-size: var(--fs-sm); margin: 0 0 12px; }
 .hero-actions { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line); margin: 0 -16px; }
-.hero-actions a { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; color: var(--text); text-decoration: none; font-weight: 600; font-size: 13px; }
+.hero-actions a { display: flex; align-items: center; justify-content: center; gap: var(--space-2); padding: 12px; color: var(--text); text-decoration: none; font-weight: 600; font-size: var(--fs-md); }
 .hero-actions a + a { border-left: 1px solid var(--line); }
 .hero-actions a:hover { background: var(--accent-soft); color: var(--accent-ink); }
-.hero-actions span { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid currentColor; font-size: 12px; }
+.hero-actions span { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid currentColor; font-size: var(--fs-sm); }
 
 /* ---------------------------------------------------------------- Transaksi terbaru */
 .tx-list { display: flex; flex-direction: column; }
-.tx-row { display: grid; grid-template-columns: minmax(0, 2.2fr) 0.9fr 0.8fr 1.1fr; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.tx-row { display: grid; grid-template-columns: minmax(0, 2.2fr) 0.9fr 0.8fr 1.1fr; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: var(--fs-md); }
 .tx-list.no-pos .tx-row { grid-template-columns: minmax(0, 2.2fr) 0.9fr 1.1fr; }
-.tx-head { font-size: 12px; color: var(--muted); padding-top: 0; }
+.tx-head { font-size: var(--fs-sm); color: var(--muted); padding-top: 0; }
 .tx-name { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .tx-name > span { min-width: 0; }
 .tx-name b { display: block; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.tx-name small { color: var(--muted); font-size: 11px; }
-.tx-avatar { width: 32px; height: 32px; flex: none; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: 11px; font-weight: 700;
+.tx-name small { color: var(--muted); font-size: var(--fs-xs); }
+.tx-avatar { width: 32px; height: 32px; flex: none; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-size: var(--fs-xs); font-weight: 700;
   background: var(--accent-soft); color: var(--accent-ink); }
-.tx-avatar.out { background: #efebe6; color: var(--ink-2); }
-.pos-pill { display: inline-block; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); font-size: 11px; color: var(--muted); white-space: nowrap; }
+.tx-avatar.out { background: var(--surface-3); color: var(--ink-2); }
+.pos-pill { display: inline-block; padding: 2px 9px; border-radius: var(--radius-pill); border: 1px solid var(--line); font-size: var(--fs-xs); color: var(--muted); white-space: nowrap; }
 .tx-amount { font-weight: 600; }
-.tx-amount.in { color: var(--status-good); }
+.tx-amount.in { color: var(--green-strong); }
 .tx-amount.out { color: var(--text); }
 
 /* ---------------------------------------------------------------- Kartu pemasukan / pengeluaran */
-.flow-total { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 24px; font-weight: 650; letter-spacing: -.01em; font-variant-numeric: tabular-nums; margin-bottom: 4px; }
-.change { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 999px; letter-spacing: 0; }
-.change.good { background: #e7f5e8; color: var(--status-good); }
-.change.bad { background: #fde9e7; color: var(--status-bad); }
+.flow-total { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: var(--fs-3xl); font-weight: 650; letter-spacing: -.01em; font-variant-numeric: tabular-nums; margin-bottom: var(--space-1); }
+.change { font-size: var(--fs-xs); font-weight: 600; padding: 3px 9px; border-radius: var(--radius-pill); letter-spacing: 0; }
+.change.good { background: var(--green-soft); color: var(--green-strong); }
+.change.bad { background: var(--red-soft); color: var(--red); }
 
 /* ---------------------------------------------------------------- Donatur */
 .donor-list { margin: 0; padding: 0; list-style: none; }
-.donor-list li { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.donor-list li { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: var(--fs-md); }
 .donor-list li:last-child { border-bottom: 0; }
 .donor-list li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -72,12 +66,12 @@
 .chart { width: 100%; height: auto; display: block; overflow: visible; }
 .chart .grid { stroke: var(--chart-grid); stroke-width: 1; }
 .chart .grid.zero { stroke: var(--chart-zero); }
-.chart .tick { fill: var(--muted); font-size: 11px; }
-.chart .cat-label { fill: var(--text); font-size: 12px; }
-.chart .value-label { fill: var(--text); font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.chart .tick { fill: var(--muted); font-size: var(--fs-xs); }
+.chart .cat-label { fill: var(--text); font-size: var(--fs-sm); }
+.chart .value-label { fill: var(--text); font-size: var(--fs-sm); font-weight: 600; font-variant-numeric: tabular-nums; }
 .chart .value-label.neg { fill: var(--red); }
 .chart .value-pill { fill: var(--ink); }
-.chart .value-pill-text { fill: #fff; font-size: 12px; font-weight: 600; }
+.chart .value-pill-text { fill: var(--on-accent); font-size: var(--fs-sm); font-weight: 600; }
 .chart .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .chart .area { opacity: .1; }
 .chart .dot { stroke: var(--surface); stroke-width: 2; }
@@ -85,17 +79,17 @@
 .chart .hit { fill: transparent; cursor: pointer; }
 .chart .hit:hover { fill: rgba(240, 132, 25, .07); }
 
-.chart-tip { position: fixed; z-index: 70; pointer-events: none; background: var(--ink); color: #fff; border-radius: 10px; padding: 7px 11px; font-size: 12px; line-height: 1.5; box-shadow: var(--shadow); font-variant-numeric: tabular-nums; }
+.chart-tip { position: fixed; z-index: 70; pointer-events: none; background: var(--ink); color: var(--on-accent); border-radius: var(--radius-sm); padding: 7px 11px; font-size: var(--fs-sm); line-height: 1.5; box-shadow: var(--shadow); font-variant-numeric: tabular-nums; }
 .sparkline path { fill: none; stroke: var(--accent-strong); stroke-width: 1.5; stroke-linejoin: round; }
 .table-wrap.flat { border: 0; border-radius: 0; }
 
 /* Kartu Pemasukan & Pengeluaran per bulan: legenda, grafik berpasangan, tabel per bulan. */
-.dcard.monthly { margin-bottom: 16px; }
+.dcard.monthly { margin-bottom: var(--space-4); }
 .monthly-legend { display: flex; justify-content: flex-end; margin: -34px 0 6px; }
-.legend { display: inline-flex; gap: 14px; font-size: 12px; color: var(--muted); }
+.legend { display: inline-flex; gap: 14px; font-size: var(--fs-sm); color: var(--muted); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
 .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-.chart .tick.future { opacity: .45; }
+.chart .tick.future { font-style: italic; } /* bulan belum berisi data: dibedakan tanpa menurunkan kontras */
 .monthly-body { display: grid; gap: 10px; }
 .monthly-body .chart { max-height: 300px; }
 
@@ -105,56 +99,66 @@
 
 /* Deretan tombol bulan (dashboard Per Bulan). */
 .month-strip { display: flex; gap: 6px; flex-wrap: wrap; margin: -4px 0 16px; }
-.month-strip button { border-radius: 999px; padding: 6px 14px; min-width: 52px; background: var(--surface); }
-.month-strip button.on { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; font-weight: 600; }
+.month-strip button { border-radius: var(--radius-pill); padding: 6px 14px; min-width: 52px; background: var(--surface); }
+.month-strip button.on { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--on-accent); font-weight: 600; }
 .month-strip button:disabled { opacity: .4; }
 
 /* ---------------------------------------------------------------- Dashboard Per Bulan */
 .view-head h1 .title-month { color: var(--accent-ink); font-weight: 600; }
 
 /* Angka utama bulan itu: deretan kartu kecil. */
-.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
-.kpi { background: var(--surface); border-radius: 18px; box-shadow: var(--shadow); padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.kpi-label { font-size: 12px; color: var(--muted); }
-.kpi-value { font-size: 18px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.kpi-value .cents { color: var(--muted); font-weight: 500; }
-.kpi small { font-size: 12px; color: var(--muted); }
+.kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--space-3); margin-bottom: var(--space-4); }
+.kpi { background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow); padding: 14px 16px; display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.kpi-label { font-size: var(--fs-sm); color: var(--muted); }
+.kpi-value { font-size: var(--fs-xl); font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi small { font-size: var(--fs-sm); color: var(--muted); }
 .kpi.in { box-shadow: var(--shadow), inset 4px 0 0 var(--accent); }
 .kpi.out { box-shadow: var(--shadow), inset 4px 0 0 var(--ink-2); }
-.kpi.strong { background: var(--ink); color: var(--ink-text, #fff); }
-.kpi.strong .kpi-label, .kpi.strong small, .kpi.strong .cents { color: var(--ink-muted, #cbbfb2); }
+.kpi.strong { background: var(--ink); color: var(--ink-text); }
+.kpi.strong .kpi-label, .kpi.strong small, .kpi.strong .cents { color: var(--ink-muted); }
 
 /* Grafik harian (lebar) + donatur. */
-.month-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: 16px; margin-bottom: 16px; align-items: start; }
+.month-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); gap: var(--space-4); margin-bottom: var(--space-4); align-items: start; }
 .month-grid > .dcard:only-child { grid-column: 1 / -1; }
 .dcard.daily .chart { max-height: 300px; }
-.pos-summary { margin-bottom: 16px; }
+.pos-summary { margin-bottom: var(--space-4); }
 
 /* Tabel semua transaksi bulan itu. */
-.month-tx { margin-bottom: 16px; }
+.month-tx { margin-bottom: var(--space-4); }
 .month-tx .filter-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
 .month-tx #txSearch { flex: 1; min-width: 200px; max-width: 320px; }
-.chip-clear { border-radius: 999px; padding: 5px 12px; background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; font-size: 12px; }
+.chip-clear { border-radius: var(--radius-pill); padding: 5px 12px; background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; font-size: var(--fs-sm); }
 .tx-scroll { max-height: 560px; overflow: auto; border-top: 1px solid var(--line); }
-.tx-table { font-size: 13px; }
+.tx-table { font-size: var(--fs-md); }
 .tx-table thead th { position: sticky; top: 0; background: var(--surface); z-index: 1; }
 .tx-table tfoot td { position: sticky; bottom: 0; background: var(--surface); font-weight: 650; border-top: 2px solid var(--line); }
 .tx-table td { padding: 6px 8px; }
-.tx-table td.out { color: #a63a2a; }
-.tx-note { display: block; font-size: 12px; }
+.tx-table td.out { color: var(--out-ink); }
+.tx-note { display: block; font-size: var(--fs-sm); }
 @media (max-width: 960px) { .month-grid { grid-template-columns: 1fr; } }
 /* Kartu angka utama: satu baris di layar lebar; 3 kolom rapi di laptop; 2 kolom di layar sempit (tanpa kartu yatim). */
 @media (max-width: 1499px) { .kpi-row { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 @media (max-width: 720px) { .kpi-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* Ponsel: angka utama boleh pindah baris (bukan terpotong "…"). */
+@media (max-width: 520px) {
+  .kpi { padding: var(--space-3); }
+  .kpi-value { font-size: var(--fs-lg); white-space: normal; overflow-wrap: anywhere; }
+  .hero-amount { font-size: var(--fs-3xl); }
+  .month-strip { flex-wrap: nowrap; overflow-x: auto; padding-bottom: var(--space-1); }
+  .month-strip button { min-width: 48px; flex: none; }
+  .tx-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .tx-row > :nth-child(2), .tx-row > :nth-child(3):not(:last-child) { display: none; } /* tanggal & pos disembunyikan; nama + jumlah tetap */
+  .tx-list.no-pos .tx-row { grid-template-columns: minmax(0, 1fr) auto; }
+}
 
 /* Per Bulan: pos tanpa transaksi di bulan itu dibuat samar. */
 .pos-summary tr.idle td { color: var(--muted); }
 .pos-summary tr.idle td b { font-weight: 500; }
 /* Layar lebar: grafik & tabel berdampingan supaya grafik tidak setinggi setengah layar. */
-@media (min-width: 1400px) { .monthly-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 24px; align-items: center; } }
-.monthly-table { font-size: 13px; }
+@media (min-width: 1400px) { .monthly-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: var(--space-6); align-items: center; } }
+.monthly-table { font-size: var(--fs-md); }
 .monthly-table th, .monthly-table td { padding: 6px 8px; }
-.monthly-table td.out { color: #a63a2a; }
+.monthly-table td.out { color: var(--out-ink); }
 .monthly-table tfoot td { font-weight: 650; border-top: 2px solid var(--line); }
 @media (max-width: 720px) { .monthly-legend { margin-top: 0; justify-content: flex-start; } }
 

@@ -1,10 +1,11 @@
 // Form transaksi (baru / ubah), rincian read-only, pecah transaksi, dan form pindahan antar pos.
-import { $, $$, html, render } from '../core/dom.js';
+import { $, html, render } from '../core/dom.js';
 import { api } from '../core/api.js';
 import { store } from '../core/store.js';
 import { money, parseAmount, todayIso, dateId, numClass } from '../core/format.js';
 import { openModal, attempt } from './feedback.js';
 import { posOptions, accountOptions } from './options.js';
+import { segmented, bindSegmented } from './controls.js';
 
 const SOURCE_NOTES = {
   mutasi: 'Baris dari mutasi bank: tanggal, akun, dan nominal mengikuti rekening koran. Yang bisa diubah: pos, kategori, nama, dan keterangan.',
@@ -37,7 +38,7 @@ export function openTransactionDetail(tx) {
         ${row('Sumber', SOURCE_LABEL[tx.source] || tx.source)}
         ${row('Kode mutasi', tx.bank_code)}
       </dl>
-      <p class="muted" style="margin:0;font-size:12px">Anda hanya punya akses melihat. Perubahan data dilakukan oleh Bendahara atau Admin.</p>`,
+      <p class="hint">Anda hanya punya akses melihat. Perubahan data dilakukan oleh Bendahara atau Admin.</p>`,
     footer: html`<div></div><button data-close>Tutup</button>`,
   });
 }
@@ -63,10 +64,8 @@ export async function openTransactionForm(tx, { posId, defaults = {}, onSaved })
         <label>Akun<select name="account_id" ${locked || readOnly ? 'disabled' : ''}>${accountOptions(tx?.account_id ?? defaults.account_id)}</select></label>
         <label class="full">Pos<select name="pos_id" required ${readOnly ? 'disabled' : ''}>${posOptions(tx?.pos_id ?? posId, { empty: 'Pilih pos…' })}</select></label>
         <div class="full">
-          <div class="segmented" role="radiogroup" aria-label="Jenis transaksi">
-            <button type="button" data-kind="in" class="${kind === 'in' ? 'on' : ''}" ${locked || readOnly ? 'disabled' : ''}>Masuk</button>
-            <button type="button" data-kind="out" class="${kind === 'out' ? 'on' : ''}" ${locked || readOnly ? 'disabled' : ''}>Keluar</button>
-          </div>
+          ${segmented({ name: 'kind', label: 'Jenis transaksi', current: kind, options: [
+            { value: 'in', label: 'Masuk', disabled: locked || readOnly }, { value: 'out', label: 'Keluar', disabled: locked || readOnly }] })}
         </div>
         <label>Nominal (Rp)<input name="amount" inputmode="decimal" required placeholder="0" value="${tx ? money(tx.masuk || tx.keluar) : ''}" ${locked || readOnly ? 'disabled' : ''}></label>
         <label>Kategori<input name="category" list="categoryList" value="${tx?.category || ''}" placeholder="DONATUR, PELITA, ANGPAO…" ${readOnly ? 'disabled' : ''}>
@@ -75,7 +74,7 @@ export async function openTransactionForm(tx, { posId, defaults = {}, onSaved })
         <label>No. Kwitansi<input name="receipt_no" value="${tx?.receipt_no || ''}" ${readOnly ? 'disabled' : ''}></label>
         <label>Piao Wen<input name="piao_wen" value="${tx?.piao_wen || ''}" ${readOnly ? 'disabled' : ''}></label>
         <label class="full">Keterangan<input name="note" value="${tx?.note || ''}" ${readOnly ? 'disabled' : ''}></label>
-        <p class="full muted" style="font-size:12px;margin:0">Kategori <b>DONATUR</b> masuk ke Daftar Donatur. Pengeluaran tanpa kategori tampil per uraian di laporan bulanan.</p>
+        <p class="full hint">Kategori <b>DONATUR</b> masuk ke Daftar Donatur. Pengeluaran tanpa kategori tampil per uraian di laporan bulanan.</p>
       </form>`,
     footer: html`
       <div class="toolbar">
@@ -86,10 +85,7 @@ export async function openTransactionForm(tx, { posId, defaults = {}, onSaved })
   });
 
   const form = $('#txForm', root);
-  $$('[data-kind]', root).forEach((btn) => btn.addEventListener('click', () => {
-    kind = btn.dataset.kind;
-    $$('[data-kind]', root).forEach((b) => b.classList.toggle('on', b === btn));
-  }));
+  bindSegmented(root, 'kind', (value) => (kind = value));
 
   async function save() {
     if (!form.reportValidity()) return;
@@ -131,7 +127,7 @@ export function openSplitForm(tx, { onSaved }) {
         <label>Ke pos<select name="pos_id" required>${posOptions('', { empty: 'Pilih pos…' })}</select></label>
         <label>Kategori<input name="category" value="${tx.category}"></label>
         <label>Nama<input name="name" value="${tx.name}"></label>
-        <p class="full muted" style="margin:0" id="splitRemainder"></p>
+        <p class="full muted mb-0" id="splitRemainder"></p>
       </form>`,
     footer: html`<div></div><div class="toolbar"><button data-close>Batal</button><button class="btn-primary" data-action="save">Pecah</button></div>`,
   });

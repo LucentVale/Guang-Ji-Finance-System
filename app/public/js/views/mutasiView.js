@@ -50,7 +50,7 @@ async function renderImported(el, accountId, month) {
       <tbody>${rows.map((r) => html`
         <tr class="${r.pos ? '' : 'row-warn'}">
           <td>${dateId(r.date)}</td>
-          <td class="muted" style="font-size:12px">${r.bank_type}${r.bank_desc ? html`<br>${r.bank_desc}` : ''}</td>
+          <td class="muted text-sm">${r.bank_type}${r.bank_desc ? html`<br>${r.bank_desc}` : ''}</td>
           <td class="mono">${r.bank_code}</td>
           <td>${r.pos || html`<span class="badge badge-warn">Belum ada</span>`}</td>
           <td class="num ${r.masuk ? 'in' : 'out'}">${money(r.masuk || r.keluar)} ${r.masuk ? 'CR' : 'DB'}</td>
@@ -65,7 +65,7 @@ function renderDropzone(panel, accountId) {
   render(panel, html`
     <h2>Impor file mutasi</h2>
     <label class="dropzone" id="dropzone">
-      <span style="font-size:26px">⇪</span>
+      <span class="icon-lg" aria-hidden="true">⇪</span>
       <b>Klik untuk memilih file, atau seret file mutasi (.xlsx) ke sini</b>
       <span>Baris yang sudah pernah diimpor otomatis dilewati, jadi aman mengimpor ulang file yang sama.</span>
       <input type="file" accept=".xlsx" hidden id="fileInput">
@@ -89,7 +89,7 @@ async function upload(panel, file, accountId) {
   }
   const first = upload.sheets[0] || {};
   render(panel, html`
-    <div class="toolbar" style="margin-bottom:12px">
+    <div class="toolbar mb-3">
       <b>${upload.file_name}</b>
       <label class="inline">Sheet <select id="sheetSel">${upload.sheets.map((s) => html`<option value="${s.name}" data-year="${s.year || store.year}">${s.name}</option>`)}</select></label>
       <label class="inline">Tahun <input id="yearInput" type="number" style="width:90px" value="${first.year || store.year}"></label>
@@ -122,13 +122,13 @@ async function showPreview(panel, request) {
   const overrides = {}; // seq -> { pos_id?, category?, name? }
 
   render(box, html`
-    <div class="toolbar" style="margin-bottom:10px">
+    <div class="toolbar mb-3">
       <span class="badge">${rows.length} baris</span>
       <span class="badge badge-ok">${fresh.length} baru</span>
       ${rows.length > fresh.length ? html`<span class="badge">${rows.length - fresh.length} sudah pernah diimpor</span>` : ''}
       ${unknown.length ? html`<span class="badge badge-warn">${unknown.length} kode pos tidak dikenal</span>` : ''}
       ${brokenChain.length ? html`<span class="badge badge-red">${brokenChain.length} saldo tidak berurutan</span>` : ''}
-      <span style="flex:1"></span>
+      <span class="spacer"></span>
       <button class="btn-primary" id="commitBtn" ${fresh.length ? '' : 'disabled'}>Simpan ${fresh.length} transaksi</button>
     </div>
     ${unknown.length ? html`<p class="notice">Baris kuning: kode pos di kolom C tidak dikenal. Pilih pos-nya di sini, atau biarkan kosong dan alokasikan nanti di Draf.</p>` : ''}
@@ -137,7 +137,7 @@ async function showPreview(panel, request) {
       <table class="sheet">
         <thead><tr><th>Tgl</th><th>Kode (kolom C)</th><th>Pos</th><th>Kategori</th><th>Nama</th><th>Masuk</th><th>Keluar</th><th>Saldo Bank</th></tr></thead>
         <tbody>${rows.map((r) => html`
-          <tr data-seq="${r.seq}" class="${!r.chain_ok ? 'row-warn' : !r.pos_id && !r.duplicate ? 'row-warn' : ''}" style="${r.duplicate ? 'opacity:.45' : ''}">
+          <tr data-seq="${r.seq}" class="${!r.chain_ok ? 'row-warn' : !r.pos_id && !r.duplicate ? 'row-warn' : ''} ${r.duplicate ? 'is-dim' : ''}">
             <td>${dateId(r.date)}</td>
             <td class="mono" title="${r.bank_desc}">${r.bank_code}</td>
             <td>${r.duplicate ? store.posById(r.pos_id)?.code || '' : html`<select class="cell-select" data-field="pos_id">${posOptions(r.pos_id, { empty: '— pilih —' })}</select>`}</td>

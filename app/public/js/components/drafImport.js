@@ -15,10 +15,10 @@ export function openDrafImport({ accountId, onSaved }) {
     title: 'Impor File DRAF Laporan Keuangan',
     wide: true,
     body: html`
-      <p class="muted" style="margin-top:0">Pilih file DRAF (mis. "DRAF Laporan Keuangan Kuang Hang 2026.xlsx"). Baris dibaca dari kolom
+      <p class="muted mt-0">Pilih file DRAF (mis. "DRAF Laporan Keuangan Kuang Hang 2026.xlsx"). Baris dibaca dari kolom
         Tgl, Pos / Nama, Keterangan, No Kwitansi, Piao Wen, Masuk, dan Keluar.</p>
       <label class="dropzone" id="drafDrop">
-        <span style="font-size:26px">⇪</span>
+        <span class="icon-lg" aria-hidden="true">⇪</span>
         <b>Klik untuk memilih file DRAF, atau seret ke sini</b>
         <input type="file" accept=".xlsx" hidden id="drafFile">
       </label>
@@ -41,7 +41,7 @@ export function openDrafImport({ accountId, onSaved }) {
     zone.hidden = true;
     // Sheet bulan terakhir (paling kiri di file manual) biasanya sudah berisi Januari s.d. bulan itu.
     render(step, html`
-      <div class="toolbar" style="margin-bottom:12px">
+      <div class="toolbar mb-3">
         <b>${up.file_name}</b>
         <label class="inline">Sheet <select id="drafSheet">${up.sheets.map((s) => html`<option value="${s.name}">${s.name}</option>`)}</select></label>
         <label class="inline">Akun <select id="drafAccount">${accountOptions(accountId)}</select></label>
@@ -70,8 +70,8 @@ export function openDrafImport({ accountId, onSaved }) {
       ${unknown ? html`<p class="notice">Ada ${unknown} baris tanpa pos yang dikenali (baris kuning). Pilih pos-nya di tabel, atau alokasikan nanti di Draf.</p>` : ''}
       ${assumed ? html`<p class="notice">${assumed} baris di file tidak punya tanggal; dipakai tanggal baris sebelumnya (ditandai *).</p>` : ''}
 
-      <h2 style="margin-top:4px">Bulan yang diimpor</h2>
-      <div class="table-wrap" style="margin-bottom:12px">
+      <h2 class="mt-2">Bulan yang diimpor</h2>
+      <div class="table-wrap mb-3">
         <table class="table">
           <thead><tr><th></th><th>Bulan</th><th class="num">Baris di file</th><th class="num">Masuk</th><th class="num">Keluar</th><th>Data yang sudah ada (akan diganti)</th></tr></thead>
           <tbody>${pv.months.map((m) => html`
@@ -87,9 +87,9 @@ export function openDrafImport({ accountId, onSaved }) {
         </table>
       </div>
 
-      <div class="toolbar" style="margin-bottom:8px">
+      <div class="toolbar mb-2">
         <span class="muted">Data akun ini di bulan yang dicentang akan <b>diganti</b> dengan isi file. Pindahan antar pos tidak terpengaruh.</span>
-        <span style="flex:1"></span>
+        <span class="spacer"></span>
         <button class="btn-primary" id="drafCommit">Simpan & Ganti Data</button>
       </div>
 

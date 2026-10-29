@@ -15,6 +15,7 @@ import { laporanView } from './views/laporanView.js';
 import { riwayatView } from './views/riwayatView.js';
 import { penggunaView } from './views/penggunaView.js';
 import { pengaturanView } from './views/pengaturanView.js';
+import { installA11y } from './core/a11y.js';
 
 // permission: izin minimal untuk membuka halaman (lihat store.can)
 const VIEWS = {
@@ -113,16 +114,42 @@ async function openApp() {
   route();
 }
 
+// Indikator "sedang memuat": baru tampil bila halaman butuh lebih dari LOADING_DELAY_MS (supaya tidak berkedip).
+const LOADING_DELAY_MS = 150;
+let routeToken = 0;
+
 async function route() {
   if (appShell.hidden) return;
+  const token = ++routeToken;
   const [name, query] = location.hash.replace(/^#\/?/, '').split('?');
   const viewName = VIEWS[name] && store.can(VIEWS[name].permission) ? name : DEFAULT_VIEW;
-  $$('#flowNav a').forEach((a) => a.classList.toggle('active', a.dataset.view === viewName));
+  const viewChanged = main.dataset.view !== viewName;
+  $$('#flowNav a').forEach((a) => {
+    const active = a.dataset.view === viewName;
+    a.classList.toggle('active', active);
+    if (active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  });
   main.className = ''; // kelas tata letak khusus (mis. view-fill) dipasang ulang oleh view yang membutuhkannya
+  main.setAttribute('aria-busy', 'true');
+  const loadingTimer = setTimeout(() => main.classList.add('is-loading'), LOADING_DELAY_MS);
   try {
     await VIEWS[viewName].render(main, new URLSearchParams(query || ''), { refreshApp: loadReferenceData });
   } catch (err) {
-    render(main, html`<div class="panel empty">Gagal memuat halaman: ${err.message}</div>`);
+    if (token === routeToken) {
+      main.className = '';
+      render(main, html`<div class="panel empty" role="alert">Gagal memuat halaman: ${err.message}
+        <div class="toolbar toolbar-center"><button type="button" id="retryRoute">Coba lagi</button></div></div>`);
+      $('#retryRoute', main)?.addEventListener('click', route);
+    }
+  } finally {
+    clearTimeout(loadingTimer);
+    if (token === routeToken) { main.classList.remove('is-loading'); main.removeAttribute('aria-busy'); }
+  }
+  main.dataset.view = viewName;
+  // Pindah ke halaman lain: fokus ke judul halaman, supaya pengguna keyboard/pembaca layar mulai dari atas isi baru.
+  if (viewChanged && token === routeToken && document.activeElement?.closest('#flowNav')) {
+    const heading = $('h1', main);
+    if (heading) { heading.setAttribute('tabindex', '-1'); heading.focus({ preventScroll: true }); }
   }
 }
 
@@ -137,4 +164,5 @@ $('#yearSelect').addEventListener('change', (e) => {
 });
 window.addEventListener('hashchange', route);
 
+installA11y();
 boot();

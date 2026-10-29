@@ -3,6 +3,8 @@
 //
 //   html`<td>${nama}</td>`            -> nama di-escape
 //   html`<ul>${items.map(i => html`<li>${i}</li>`)}</ul>`  -> hasil html bersarang tidak di-escape ulang
+//   ${kondisi && html`...`}           -> false/null/undefined menjadi teks kosong
+// Atribut ARIA bernilai boolean wajib ditulis eksplisit: aria-pressed="${String(aktif)}" (false -> "false").
 
 class SafeHtml {
   constructor(value) { this.value = value; }

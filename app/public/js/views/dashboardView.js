@@ -9,6 +9,8 @@ import { store } from '../core/store.js';
 import { money, numClass, rupiah, dateId, dateShort, MONTHS } from '../core/format.js';
 import { miniBarChart, balanceLineChart, rankedBarChart, attachTooltips, monthlyFlowChart, flowLegend } from '../components/charts.js';
 import { bigMoney, card, donorCard, posSummaryCard, initials, minus, signed } from '../components/dashboardCards.js';
+import { segmented, bindSegmented } from '../components/controls.js';
+import { refreshView } from '../core/router.js';
 import { renderMonthDashboard } from './dashboardMonth.js';
 
 const throughLabel = (lastMonth) => (lastMonth ? `Data s.d. ${MONTHS[lastMonth - 1]} ${store.year}` : `Belum ada data ${store.year}`);
@@ -44,9 +46,6 @@ function dashboardHash(posId, month) {
   return `#/dashboard${q.size ? `?${q}` : ''}`;
 }
 
-/** Gambar ulang halaman (mis. setelah transaksi diubah dari dashboard Per Bulan). */
-const rerenderView = () => window.dispatchEvent(new HashChangeEvent('hashchange'));
-
 export async function dashboardView(main, params) {
   const posId = Number(params.get('pos')) || null;
   const requested = Number(params.get('bulan'));
@@ -70,10 +69,8 @@ export async function dashboardView(main, params) {
         <p class="sub">${sub}</p>
       </div>
       <div class="view-filters">
-        <div class="segmented" role="tablist" aria-label="Jenis dashboard">
-          <button role="tab" data-mode="tahun" class="${month ? '' : 'on'}" aria-selected="${!month}">Keseluruhan</button>
-          <button role="tab" data-mode="bulan" class="${month ? 'on' : ''}" aria-selected="${!!month}" ${overview.last_month ? '' : 'disabled'}>Per Bulan</button>
-        </div>
+        ${segmented({ name: 'mode', label: 'Jenis dashboard', current: month ? 'bulan' : 'tahun', options: [
+          { value: 'tahun', label: 'Keseluruhan' }, { value: 'bulan', label: 'Per Bulan', disabled: !overview.last_month }] })}
         <label class="pill-select"><span>Tampilkan</span>
           <select id="posFilter" aria-label="Pilih pos">
             <option value="">Semua pos</option>
@@ -87,9 +84,9 @@ export async function dashboardView(main, params) {
 
   $('#posFilter', main).addEventListener('change', (e) => (location.hash = dashboardHash(e.target.value, month)));
   // Keseluruhan = setahun; Per Bulan dimulai dari bulan terakhir yang berisi data.
-  main.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => {
-    location.hash = dashboardHash(posId, b.dataset.mode === 'bulan' ? month || overview.last_month : null);
-  }));
+  bindSegmented($('.view-filters', main), 'mode', (mode) => {
+    location.hash = dashboardHash(posId, mode === 'bulan' ? month || overview.last_month : null);
+  });
   const dash = $('#dash', main);
   attachTooltips(dash);
   // Baris "per pos" (data-pos) dan batang "Saldo per pos" (data-id) membuka rincian pos, di jenis dashboard yang sama.
@@ -101,7 +98,7 @@ export async function dashboardView(main, params) {
   const strip = $('.month-strip', main);
   if (strip) on(strip, 'click', '[data-month]', goMonth);
 
-  if (month) await renderMonthDashboard(dash, { data: detail || overview, month, posId, overview, onChanged: rerenderView });
+  if (month) await renderMonthDashboard(dash, { data: detail || overview, month, posId, overview, onChanged: refreshView });
 }
 
 /** Deretan tombol bulan untuk dashboard Per Bulan (hanya bulan yang sudah berisi data). */

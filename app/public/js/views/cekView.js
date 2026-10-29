@@ -29,7 +29,7 @@ export async function cekView(main, params) {
 
     <p class="notice ${r.ready ? 'notice-ok' : ''}">${r.ready ? `✓ Semua pemeriksaan lolos. Laporan ${period} siap dibuat.` : `Masih ada yang belum cocok untuk ${period}.`}</p>
 
-    <div class="cols" style="margin-bottom:14px">
+    <div class="cols mb-4">
       <section class="panel">
         <h2>Pemeriksaan</h2>
         <ul class="checklist">${r.checks.map((c) => html`

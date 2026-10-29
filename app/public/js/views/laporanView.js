@@ -77,7 +77,7 @@ function reportPage(b, report, period) {
       </table>
       ${b.donors.length ? html`
         <div class="report-donors">
-          <div class="report-title" style="font-size:14px">Daftar Donatur ${b.pos.name.toUpperCase()} ${report.year}</div>
+          <div class="report-title report-title-sm">Daftar Donatur ${b.pos.name.toUpperCase()} ${report.year}</div>
           <table class="report-table">
             ${COLS}
             ${itemRows(b.donors.map((d) => ({ label: d.name, amount: d.amount })))}

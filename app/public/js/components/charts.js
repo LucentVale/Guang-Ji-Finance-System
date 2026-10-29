@@ -12,7 +12,7 @@ export const COLORS = {
   accentLine: 'var(--accent-strong)',    // garis 2px (lebih gelap agar kontras dengan latar putih)
   accentMuted: 'var(--accent-tint)',     // batang yang tidak disorot
   ink: 'var(--ink-2)',                   // sorotan gelap (kartu pengeluaran)
-  inkMuted: '#ddd5cb',
+  inkMuted: 'var(--chart-ink-soft)',
 };
 const W = 640;
 const BAR_MAX = 24;

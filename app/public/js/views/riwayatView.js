@@ -15,11 +15,11 @@ export async function riwayatView(main) {
         <thead><tr><th>Waktu</th><th>Pengguna</th><th>Fothang</th><th>Aktivitas</th><th>Rincian</th></tr></thead>
         <tbody>${entries.length ? entries.map((e) => html`
           <tr>
-            <td class="muted" style="white-space:nowrap">${e.at}</td>
+            <td class="muted nowrap">${e.at}</td>
             <td class="mono">${e.username}</td>
             <td>${fothangName(e.fothang_id)}</td>
             <td class="${e.action.startsWith('Gagal') ? 'neg' : ''}">${e.action}${e.entity_id ? html` <span class="muted">#${e.entity_id}</span>` : ''}</td>
-            <td class="mono" style="max-width:420px;word-break:break-word;font-size:11px">${e.detail}</td>
+            <td class="mono audit-detail">${e.detail}</td>
           </tr>`) : html`<tr><td colspan="5" class="empty">Belum ada aktivitas.</td></tr>`}
         </tbody>
       </table>

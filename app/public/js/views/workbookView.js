@@ -9,6 +9,8 @@ import { store } from '../core/store.js';
 import { amount, numClass, dayOf, dateId, MONTHS } from '../core/format.js';
 import { toast } from '../components/feedback.js';
 import { openTransactionForm, openTransferForm, openTransactionDetail } from '../components/transactionForms.js';
+import { segmented, bindSegmented, setSegmented, debounce, SEARCH_DELAY_MS } from '../components/controls.js';
+import { refreshView } from '../core/router.js';
 
 const SHEET_TABEL = 'tabel';
 const FLASH_MS = 1600;
@@ -40,12 +42,11 @@ export async function workbookView(main, params) {
   const mode = isPos ? 'pos' : sheet;
 
   render(main, html`
-    <section class="workbook">
+    <h1 class="sr-only">3. Laporan per Pos — ${isPos ? store.posById(sheet).name : 'Rekap Saldo'} ${store.year}</h1>
+    <section class="workbook" aria-label="Laporan per Pos">
       <div class="workbook-toolbar">
-        <div class="segmented" role="tablist" aria-label="Tampilan">
-          <button role="tab" data-go="${SHEET_TABEL}" class="${mode === SHEET_TABEL ? 'on' : ''}" aria-selected="${mode === SHEET_TABEL}">Rekap</button>
-          <button role="tab" data-go="pos" class="${mode === 'pos' ? 'on' : ''}" aria-selected="${mode === 'pos'}" ${lastPosId ? '' : 'disabled'}>Per Pos</button>
-        </div>
+        ${segmented({ name: 'view', label: 'Tampilan', current: mode, options: [
+          { value: SHEET_TABEL, label: 'Rekap' }, { value: 'pos', label: 'Per Pos', disabled: !lastPosId }] })}
         ${isPos ? html`
           <label class="pos-picker"><span class="sr-only">Pilih pos</span>
             <select id="posPicker">${store.pos.map((p) => html`
@@ -61,10 +62,10 @@ export async function workbookView(main, params) {
       <div class="sheet-scroll" id="sheetBody"><div class="empty">Memuat…</div></div>
     </section>`);
 
-  $$('[data-go]', main).forEach((b) => b.addEventListener('click', () => {
-    const target = b.dataset.go === 'pos' ? lastPosId : b.dataset.go;
+  bindSegmented($('.workbook-toolbar', main), 'view', (value) => {
+    const target = value === 'pos' ? lastPosId : value;
     if (target) location.hash = `#/tahunan?sheet=${target}`;
-  }));
+  });
   $('#posPicker', main)?.addEventListener('change', (e) => (location.hash = `#/tahunan?sheet=${e.target.value}`));
 
   const body = $('#sheetBody', main);
@@ -76,7 +77,8 @@ export async function workbookView(main, params) {
   function loadSheet() {
     if (sheet === SHEET_TABEL) {
       render(actions, html`<button data-act="transfer" data-write>⇄ Pindahan Pos</button>`);
-      $('[data-act="transfer"]', actions).addEventListener('click', () => openTransferForm({ onSaved: rerenderView }));
+      // Sesudah pindahan, gambar ulang seluruh halaman: saldo semua pos di pemilih pos ikut berubah.
+      $('[data-act="transfer"]', actions).addEventListener('click', () => openTransferForm({ onSaved: refreshView }));
       return renderTabel(body, tabel);
     }
     return renderPosSheet({ body, summary, actions, posId: Number(sheet), reload, filters });
@@ -97,9 +99,6 @@ export async function workbookView(main, params) {
   await loadSheet();
 }
 
-/** Gambar ulang seluruh halaman (bukan hanya isi sheet), mis. setelah pindahan: saldo semua pos di pemilih pos ikut berubah. */
-const rerenderView = () => window.dispatchEvent(new HashChangeEvent('hashchange'));
-
 /** Sorot sebentar baris yang baru diubah; gulir seperlunya bila baris itu di luar layar. */
 function flashRow(body, id) {
   const tr = $(`tr[data-id="${CSS.escape(String(id))}"]`, body);
@@ -113,8 +112,8 @@ function flashRow(body, id) {
 
 /** Sel saldo pembanding (rekening koran). Tanpa pembanding: "—" + alasannya, bukan 0. */
 const actualCell = (a) => (a.has_comparison
-  ? html`<td class="num">${amount(a.actual)}${a.actual_date ? html`<div class="muted" style="font-size:11px">per ${dateId(a.actual_date)}</div>` : ''}</td>`
-  : html`<td class="num muted">—<div style="font-size:11px">${a.actual_note}</div></td>`);
+  ? html`<td class="num">${amount(a.actual)}${a.actual_date ? html`<div class="muted text-xs">per ${dateId(a.actual_date)}</div>` : ''}</td>`
+  : html`<td class="num muted">—<div class="text-xs">${a.actual_note}</div></td>`);
 
 /** Sel selisih. Tanda ✓ hanya bila benar-benar dicocokkan dengan pembanding dan hasilnya 0. */
 function selisihCell(value, hasComparison) {
@@ -156,7 +155,6 @@ function renderTabel(body, t) {
 
 // Filter sheet pos (disimpan di hash, mis. #/tahunan?sheet=1&bulan=2&q=irene&jenis=keluar).
 const FILTER_TYPES = { '': 'Semua', masuk: 'Masuk', keluar: 'Keluar' };
-const SEARCH_DELAY_MS = 200;
 
 /** Baca filter dari parameter hash; nilai yang tidak dikenal diabaikan. */
 function filtersFrom(params) {
@@ -232,7 +230,7 @@ async function renderPosSheet({ body, summary, actions, posId, reload, filters }
     <button data-act="add" data-write>+ Transaksi</button>
     <button data-act="transfer" data-write>⇄ Pindahan Pos</button>`);
   $('[data-act="add"]', actions).addEventListener('click', () => openTransactionForm(null, { posId, onSaved: () => reload() }));
-  $('[data-act="transfer"]', actions).addEventListener('click', () => openTransferForm({ fromPosId: posId, onSaved: rerenderView }));
+  $('[data-act="transfer"]', actions).addEventListener('click', () => openTransferForm({ fromPosId: posId, onSaved: refreshView }));
 
   // Bilah filter digambar sekali (supaya kotak cari tidak kehilangan fokus); kartu & tabel digambar ulang saat filter berubah.
   render(summary, html`
@@ -241,9 +239,7 @@ async function renderPosSheet({ body, summary, actions, posId, reload, filters }
         <select id="fBulan"><option value="0">Semua</option>${MONTHS.map((m, i) => html`<option value="${i + 1}" ${filters.bulan === i + 1 ? 'selected' : ''}>${m}</option>`)}</select>
       </label>
       <input id="fCari" type="search" placeholder="Cari nama, kategori, catatan…" value="${filters.q}" aria-label="Cari transaksi">
-      <div class="segmented" role="group" aria-label="Jenis transaksi">
-        ${Object.entries(FILTER_TYPES).map(([v, label]) => html`<button type="button" data-jenis="${v}" class="${filters.jenis === v ? 'on' : ''}">${label}</button>`)}
-      </div>
+      ${segmented({ name: 'jenis', label: 'Jenis transaksi', current: filters.jenis, options: Object.entries(FILTER_TYPES).map(([value, label]) => ({ value, label })) })}
       <button type="button" id="fReset" class="btn-ghost">Hapus filter</button>
       <span id="posWarn" class="warn-slot"></span>
     </div>
@@ -322,7 +318,7 @@ async function renderPosSheet({ body, summary, actions, posId, reload, filters }
             return html`
               <tr class="row-month">
                 <td colspan="${colspan}" class="month-cell">
-                  <button type="button" class="month-toggle" data-month="${m.month}" aria-expanded="${isOpen}" ${filtered ? 'disabled' : ''}>
+                  <button type="button" class="month-toggle" data-month="${m.month}" aria-expanded="${String(isOpen)}" ${filtered ? 'disabled' : ''}>
                     <span class="caret" aria-hidden="true">${isOpen ? '▾' : '▸'}</span>${MONTHS[m.month - 1].toUpperCase()} ${store.year}
                     <span class="month-count">${textFilter ? `${m.visibleRows.length} dari ${m.rows.length}` : m.rows.length} transaksi</span>
                   </button>
@@ -373,19 +369,13 @@ async function renderPosSheet({ body, summary, actions, posId, reload, filters }
     draw();
   }
   $('#fBulan', summary).addEventListener('change', (e) => update({ bulan: Number(e.target.value) }));
-  let searchTimer;
-  $('#fCari', summary).addEventListener('input', (e) => {
-    clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => update({ q: e.target.value.trim() }), SEARCH_DELAY_MS);
-  });
-  on(summary, 'click', '[data-jenis]', (e, btn) => {
-    $$('[data-jenis]', summary).forEach((b) => b.classList.toggle('on', b === btn));
-    update({ jenis: btn.dataset.jenis });
-  });
+  const search = debounce((q) => update({ q }), SEARCH_DELAY_MS);
+  $('#fCari', summary).addEventListener('input', (e) => search(e.target.value.trim()));
+  bindSegmented(summary, 'jenis', (jenis) => update({ jenis }));
   $('#fReset', summary).addEventListener('click', () => {
     $('#fBulan', summary).value = '0';
     $('#fCari', summary).value = '';
-    $$('[data-jenis]', summary).forEach((b) => b.classList.toggle('on', b.dataset.jenis === ''));
+    setSegmented(summary, 'jenis', '');
     update({ bulan: 0, q: '', jenis: '' });
   });
 

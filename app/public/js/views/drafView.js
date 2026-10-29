@@ -59,7 +59,7 @@ export async function drafView(main, params) {
         <a class="btn btn-primary" href="#/tahunan">Lanjut ke 3. Laporan per Pos →</a>
       </div>
     </div>
-    <div class="toolbar" style="margin-bottom:10px">
+    <div class="toolbar mb-3">
       ${sourceBadge(draf.rows)}
       ${unallocated ? html`<span class="badge badge-warn">${unallocated} belum punya pos</span>` : html`<span class="badge badge-ok">Semua sudah punya pos</span>`}
       ${draf.rows.some((r) => r.match !== null) ? (mismatched ? html`<span class="badge badge-red">${mismatched} saldo tidak cocok</span>` : html`<span class="badge badge-ok">Saldo cocok dengan bank</span>`) : ''}

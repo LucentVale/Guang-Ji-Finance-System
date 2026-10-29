@@ -13,18 +13,19 @@
   <link rel="stylesheet" href="css/dashboard.css">
 </head>
 <body>
+  <a class="skip-link" href="#view" id="skipLink">Lewati ke isi halaman</a>
   <!-- Ditampilkan sebelum login (halaman masuk / buat Admin pertama / wajib ganti kata sandi) -->
   <main id="authScreen" class="auth-screen" hidden></main>
 
   <!-- Aplikasi utama: sidebar gelap di kiri, panel kerja terang di kanan -->
   <div id="appShell" class="shell" hidden>
     <aside class="sidebar no-print">
-      <a class="brand" href="#/dashboard">
-        <img src="img/logo-emblem.png" alt="Logo Guang Ji">
+      <a class="brand" href="#/dashboard" aria-label="Guang Ji, Sistem Keuangan — ke Dashboard">
+        <img src="img/logo-emblem.png" alt="">
         <span><strong>Guang Ji</strong><small>Sistem Keuangan</small></span>
       </a>
 
-      <nav id="flowNav" class="side-nav" aria-label="Menu">
+      <nav id="flowNav" class="side-nav" aria-label="Menu utama">
         <a href="#/dashboard" data-view="dashboard">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4zm0 7h6v-5H4zm10 0h6v-9h-6zm0-16v5h6V4z"/></svg><span>Dashboard</span></a>
 
@@ -63,7 +64,7 @@
           <label class="pill-select"><span>Tahun</span><select id="yearSelect" aria-label="Pilih tahun buku"></select></label>
         </div>
       </header>
-      <main id="view"></main>
+      <main id="view" tabindex="-1"></main>
     </div>
   </div>
 

@@ -10,9 +10,9 @@ import { money, numClass, dateShort, dayOf, MONTHS } from '../core/format.js';
 import { dailyFlowChart, flowLegend } from '../components/charts.js';
 import { bigMoney, card, donorCard, posSummaryCard, minus, signed } from '../components/dashboardCards.js';
 import { openTransactionForm, openTransactionDetail } from '../components/transactionForms.js';
+import { segmented, bindSegmented, debounce, SEARCH_DELAY_MS } from '../components/controls.js';
 
 const TYPES = { '': 'Semua', masuk: 'Masuk', keluar: 'Keluar' };
-const SEARCH_DELAY_MS = 200;
 
 /** Angka utama periode, sama bentuknya untuk semua pos (data.totals) maupun satu pos (data). */
 function summaryOf(data, isPos) {
@@ -70,9 +70,7 @@ export async function renderMonthDashboard(dash, { data, month, posId, overview,
       <header><div><h2>Semua transaksi ${monthName} ${store.year}</h2>
         <p>${store.can('write') ? 'Klik baris untuk melihat rincian atau mengubah' : 'Klik baris untuk melihat rincian'}</p></div></header>
       <div class="filter-bar" role="search">
-        <div class="segmented" role="group" aria-label="Jenis transaksi">
-          ${Object.entries(TYPES).map(([v, label]) => html`<button type="button" data-jenis="${v}" class="${v === '' ? 'on' : ''}" aria-pressed="${v === ''}">${label}</button>`)}
-        </div>
+        ${segmented({ name: 'jenis', label: 'Jenis transaksi', current: '', options: Object.entries(TYPES).map(([value, label]) => ({ value, label })) })}
         ${isPos ? '' : html`<label class="inline">Pos
           <select id="txPos"><option value="">Semua pos</option>${overview.pos.map((p) => html`<option value="${p.pos_id}">${p.number}. ${p.name}</option>`)}</select></label>`}
         <input type="search" id="txSearch" placeholder="Cari nama, kategori, catatan…" aria-label="Cari transaksi">
@@ -122,17 +120,10 @@ export async function renderMonthDashboard(dash, { data, month, posId, overview,
   drawTable();
 
   // Saringan: jenis, pos, kata kunci, tanggal (dari grafik harian).
-  dash.querySelectorAll('[data-jenis]').forEach((b) => b.addEventListener('click', () => {
-    filters.jenis = b.dataset.jenis;
-    dash.querySelectorAll('[data-jenis]').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-pressed', String(x === b)); });
-    drawTable();
-  }));
+  bindSegmented($('#monthTx', dash), 'jenis', (jenis) => { filters.jenis = jenis; drawTable(); });
   $('#txPos', dash)?.addEventListener('change', (e) => { filters.pos = e.target.value; drawTable(); });
-  let timer;
-  $('#txSearch', dash).addEventListener('input', (e) => {
-    clearTimeout(timer);
-    timer = setTimeout(() => { filters.q = e.target.value.trim().toLowerCase(); drawTable(); }, SEARCH_DELAY_MS);
-  });
+  const search = debounce((q) => { filters.q = q; drawTable(); }, SEARCH_DELAY_MS);
+  $('#txSearch', dash).addEventListener('input', (e) => search(e.target.value.trim().toLowerCase()));
   on(dash, 'click', '[data-day]', (e, el) => {
     filters.day = Number(el.dataset.day);
     drawTable();

@@ -35,7 +35,7 @@ function openChangePassword() {
         <label class="full">Kata sandi lama<input name="current" type="password" required autocomplete="current-password"></label>
         <label>Kata sandi baru<input name="next" type="password" required autocomplete="new-password"></label>
         <label>Ulangi kata sandi baru<input name="next2" type="password" required autocomplete="new-password"></label>
-        <p class="full muted" style="margin:0;font-size:12px">Minimal 8 karakter, berisi huruf dan angka. Perangkat lain yang sedang masuk dengan akun ini akan otomatis keluar.</p>
+        <p class="full hint">Minimal 8 karakter, berisi huruf dan angka. Perangkat lain yang sedang masuk dengan akun ini akan otomatis keluar.</p>
       </form>`,
     footer: html`<div></div><div class="toolbar"><button data-close>Batal</button><button class="btn-primary" data-act="save">Simpan</button></div>`,
   });
