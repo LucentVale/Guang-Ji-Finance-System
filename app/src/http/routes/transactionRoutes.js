@@ -15,5 +15,6 @@ module.exports = function register(router, { services }) {
     { audit: 'Mengalokasikan pos' });
   router.post('/api/fothang/:fothangId/transfers', ({ params, body }) => reply.created({ transfer_id: services.transaction.transfer(params.fothangId, body) }),
     { audit: 'Pindahan antar pos' });
+  router.get('/api/fothang/:fothangId/pos-balance', ({ params, query }) => services.transaction.posBalance(params.fothangId, query));
   router.get('/api/fothang/:fothangId/categories', ({ params }) => services.transaction.categories(params.fothangId));
 };

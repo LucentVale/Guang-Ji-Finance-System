@@ -51,6 +51,9 @@ module.exports = function transactionRepo(db) {
         .get(accountId, from, to).cents;
     },
 
+    /** Urutan (seq) terbesar di satu akun pada satu tanggal; baris baru diberi seq sesudahnya supaya tampil paling bawah. */
+    lastSeqOn: (accountId, date) => db.prepare('SELECT COALESCE(MAX(seq), 0) AS s FROM transactions WHERE account_id = ? AND date = ?').get(accountId, date).s,
+
     /** Saldo rekening koran terakhir sebelum tanggal tertentu (baris mutasi terakhir). */
     lastStatementBalance(accountId, before) {
       return db.prepare(`SELECT date, balance_cents FROM transactions

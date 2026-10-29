@@ -8,7 +8,7 @@ const { clean, upper, titleCase } = require('../lib/text');
 const { assertOwned } = require('./guards');
 const present = require('./presenters');
 
-module.exports = function transactionService({ db, repos }) {
+module.exports = function transactionService({ db, repos, services }) {
   function lookups(fothangId) {
     return {
       accounts: new Map(repos.account.listByFothang(fothangId).map((a) => [a.id, a])),
@@ -141,15 +141,30 @@ module.exports = function transactionService({ db, repos }) {
       return owned.length;
     },
 
-    /** Pindahan antar pos dalam satu akun: dua baris berpasangan, total saldo akun tidak berubah. */
+    /** Saldo satu pos di satu akun per tanggal (rupiah) — dipakai form pindahan untuk "pindahkan semua saldo". */
+    posBalance(fothangId, query) {
+      const pos = assertOwned(repos.pos.findById(Number(query.pos_id)), fothangId, 'Pos');
+      const account = assertOwned(repos.account.findById(Number(query.account_id)), fothangId, 'Akun');
+      const date = assertIsoDate(query.date);
+      // Saldo awal pos + transaksi s/d tanggal itu (snapshot menghitung SEBELUM tanggal, jadi pakai hari berikutnya).
+      const nextDay = new Date(Date.parse(`${date}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
+      const saldo = services.balance.snapshot(fothangId, nextDay).of(pos.id, account.id);
+      return { pos_id: pos.id, account_id: account.id, date, saldo: saldo / 100 };
+    },
+
+    /**
+     * Pindahan antar pos dalam satu akun: dua baris berpasangan, total saldo akun tidak berubah.
+     * Baris pindahan diletakkan paling bawah pada tanggalnya (seperti di file Laporan Keuangan).
+     */
     transfer(fothangId, input) {
       const from = assertOwned(repos.pos.findById(Number(input.from_pos_id)), fothangId, 'Pos asal');
       const to = assertOwned(repos.pos.findById(Number(input.to_pos_id)), fothangId, 'Pos tujuan');
       if (from.id === to.id) throw badRequest('Pos asal dan tujuan harus berbeda');
       const account = assertOwned(repos.account.findById(Number(input.account_id)), fothangId, 'Akun');
       const cents = positiveCents(input.amount);
+      const date = assertIsoDate(input.date);
       const base = {
-        fothang_id: fothangId, account_id: account.id, date: assertIsoDate(input.date),
+        fothang_id: fothangId, account_id: account.id, date, seq: repos.transaction.lastSeqOn(account.id, date) + 1,
         note: clean(input.note), source: 'pindahan', transfer_id: crypto.randomUUID(),
       };
       inTransaction(db, () => {

@@ -1,8 +1,8 @@
 // Form transaksi (baru / ubah), rincian read-only, pecah transaksi, dan form pindahan antar pos.
-import { $, $$, html } from '../core/dom.js';
+import { $, $$, html, render } from '../core/dom.js';
 import { api } from '../core/api.js';
 import { store } from '../core/store.js';
-import { money, parseAmount, todayIso, dateId } from '../core/format.js';
+import { money, parseAmount, todayIso, dateId, numClass } from '../core/format.js';
 import { openModal, attempt } from './feedback.js';
 import { posOptions, accountOptions } from './options.js';
 
@@ -149,24 +149,72 @@ export function openSplitForm(tx, { onSaved }) {
   });
 }
 
-/** Pindahan saldo dari satu pos ke pos lain dalam satu akun. */
+/**
+ * Pindahan saldo dari satu pos ke pos lain dalam satu akun.
+ * Form menampilkan saldo kedua pos per tanggal pindahan, sebelum dan sesudah, serta tombol "Semua saldo".
+ */
 export function openTransferForm({ fromPosId, onSaved }) {
   const { root, close } = openModal({
     title: 'Pindahan Antar Pos',
     body: html`
-      <p class="muted">Contoh: "Pindahan dari Phing An Ten" ke Cu Than, atau bagian KFCC dari donasi yang masuk ke Cu Than. Total saldo akun tidak berubah.</p>
+      <p class="muted">Contoh: "Pindahan dari Phing An Ten" ke Cu Than, atau bagian KFCC dari donasi yang masuk ke Cu Than.
+        Uangnya tetap di rekening yang sama, jadi total saldo akun tidak berubah.</p>
       <form class="form-grid" id="transferForm">
         <label>Tanggal<input type="date" name="date" required value="${defaultDate()}"></label>
         <label>Akun<select name="account_id">${accountOptions()}</select></label>
         <label>Dari pos<select name="from_pos_id" required>${posOptions(fromPosId, { empty: 'Pilih…' })}</select></label>
         <label>Ke pos<select name="to_pos_id" required>${posOptions('', { empty: 'Pilih…' })}</select></label>
-        <label>Nominal (Rp)<input name="amount" inputmode="decimal" required placeholder="0"></label>
+        <label>Nominal (Rp)
+          <span class="input-with-action"><input name="amount" inputmode="decimal" required placeholder="0">
+            <button type="button" data-action="all" title="Isi dengan seluruh saldo pos asal per tanggal ini">Semua saldo</button></span></label>
         <label>Keterangan<input name="note" placeholder="opsional"></label>
-      </form>`,
+      </form>
+      <div class="transfer-preview" id="transferPreview" aria-live="polite"></div>`,
     footer: html`<div></div><div class="toolbar"><button data-close>Batal</button><button class="btn-primary" data-action="save">Simpan Pindahan</button></div>`,
   });
+  const form = $('#transferForm', root);
+  const preview = $('#transferPreview', root);
+  const balances = { from: null, to: null }; // saldo pos asal & tujuan per tanggal, dari server
+
+  async function balanceOf(posId, { date, account_id }) {
+    if (!posId || !date || !account_id) return null;
+    try { return (await api.get('/pos-balance', { pos_id: posId, account_id, date })).saldo; } catch { return null; }
+  }
+
+  function drawPreview() {
+    const data = Object.fromEntries(new FormData(form));
+    const nominal = parseAmount(data.amount);
+    const line = (posId, saldo, delta) => {
+      const pos = store.posById(Number(posId));
+      if (!pos || saldo == null) return '';
+      const after = Math.round((saldo + delta) * 100) / 100;
+      return html`<tr><td>${pos.name}</td><td class="${numClass(saldo)}">${money(saldo)}</td><td class="num">→</td>
+        <td class="${numClass(after)}"><b>${money(after)}</b></td></tr>`;
+    };
+    const fromAfter = balances.from == null ? null : balances.from - nominal;
+    render(preview, html`
+      ${balances.from == null && balances.to == null ? '' : html`
+        <table class="mini-table"><thead><tr><th>Saldo per ${dateId(data.date)}</th><th class="num">Sebelum</th><th></th><th class="num">Sesudah</th></tr></thead>
+          <tbody>${line(data.from_pos_id, balances.from, -nominal)}${line(data.to_pos_id, balances.to, nominal)}</tbody></table>`}
+      ${fromAfter != null && fromAfter < -0.004 ? html`<p class="warn-text">Saldo pos asal akan menjadi minus. Periksa nominalnya.</p>` : ''}`);
+  }
+
+  async function refreshBalances() {
+    const data = Object.fromEntries(new FormData(form));
+    [balances.from, balances.to] = await Promise.all([balanceOf(data.from_pos_id, data), balanceOf(data.to_pos_id, data)]);
+    drawPreview();
+  }
+
+  ['date', 'account_id', 'from_pos_id', 'to_pos_id'].forEach((name) => form.elements[name].addEventListener('change', refreshBalances));
+  form.elements.amount.addEventListener('input', drawPreview);
+  $('[data-action="all"]', root).addEventListener('click', () => {
+    if (balances.from == null) return;
+    form.elements.amount.value = money(Math.max(balances.from, 0));
+    drawPreview();
+  });
+  refreshBalances();
+
   $('[data-action="save"]', root).addEventListener('click', async () => {
-    const form = $('#transferForm', root);
     if (!form.reportValidity()) return;
     const data = Object.fromEntries(new FormData(form));
     if (await attempt(() => api.post('/transfers', { ...data, amount: parseAmount(data.amount) }), 'Pindahan disimpan')) { close(); onSaved(); }

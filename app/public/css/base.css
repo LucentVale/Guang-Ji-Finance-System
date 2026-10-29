@@ -103,6 +103,20 @@ label.check { flex-direction: row; align-items: center; gap: 7px; color: var(--t
 
 @media (max-width: 720px) { .form-grid { grid-template-columns: 1fr; } }
 
+/* Kotak isian dengan tombol di sebelahnya (mis. Nominal + "Semua saldo"). */
+.input-with-action { display: flex; gap: 6px; }
+.input-with-action input { flex: 1; min-width: 0; }
+.input-with-action button { white-space: nowrap; padding: 6px 10px; font-size: 12px; }
+
+/* Pratinjau saldo sebelum/sesudah pada form pindahan antar pos. */
+.transfer-preview:not(:empty) { margin-top: 14px; }
+.mini-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.mini-table th { text-align: left; color: var(--muted); font-weight: 600; font-size: 12px; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.mini-table th.num { text-align: right; }
+.mini-table td { padding: 5px 6px; border-bottom: 1px solid var(--line); }
+.mini-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.warn-text { color: var(--red); font-size: 12px; margin: 8px 0 0; }
+
 /* Daftar rincian (label : nilai), mis. rincian transaksi read-only. */
 .detail-list { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 0 0 14px; }
 .detail-list dt { color: var(--muted); font-size: 12px; padding-top: 2px; }

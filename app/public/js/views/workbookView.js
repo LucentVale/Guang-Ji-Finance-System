@@ -74,7 +74,11 @@ export async function workbookView(main, params) {
   const actions = $('#sheetActions', main);
 
   function loadSheet() {
-    if (sheet === SHEET_TABEL) return renderTabel(body, tabel);
+    if (sheet === SHEET_TABEL) {
+      render(actions, html`<button data-act="transfer" data-write>⇄ Pindahan Pos</button>`);
+      $('[data-act="transfer"]', actions).addEventListener('click', () => openTransferForm({ onSaved: rerenderView }));
+      return renderTabel(body, tabel);
+    }
     return renderPosSheet({ body, summary, actions, posId: Number(sheet), reload, filters });
   }
 
@@ -92,6 +96,9 @@ export async function workbookView(main, params) {
 
   await loadSheet();
 }
+
+/** Gambar ulang seluruh halaman (bukan hanya isi sheet), mis. setelah pindahan: saldo semua pos di pemilih pos ikut berubah. */
+const rerenderView = () => window.dispatchEvent(new HashChangeEvent('hashchange'));
 
 /** Sorot sebentar baris yang baru diubah; gulir seperlunya bila baris itu di luar layar. */
 function flashRow(body, id) {
@@ -225,7 +232,7 @@ async function renderPosSheet({ body, summary, actions, posId, reload, filters }
     <button data-act="add" data-write>+ Transaksi</button>
     <button data-act="transfer" data-write>⇄ Pindahan Pos</button>`);
   $('[data-act="add"]', actions).addEventListener('click', () => openTransactionForm(null, { posId, onSaved: () => reload() }));
-  $('[data-act="transfer"]', actions).addEventListener('click', () => openTransferForm({ fromPosId: posId, onSaved: () => reload() }));
+  $('[data-act="transfer"]', actions).addEventListener('click', () => openTransferForm({ fromPosId: posId, onSaved: rerenderView }));
 
   // Bilah filter digambar sekali (supaya kotak cari tidak kehilangan fokus); kartu & tabel digambar ulang saat filter berubah.
   render(summary, html`

@@ -85,6 +85,26 @@ test('pindahan antar pos tidak mengubah total, dan baris mutasi terkunci', async
   assert.equal(after.date, '2026-01-02');
 });
 
+test('pindahan: tampil paling bawah pada tanggalnya, dan saldo pos per tanggal ikut bergeser', async () => {
+  const t = createTestContext();
+  const { request } = await importJanuary(t);
+  t.ctx.services.imports.commit(t.fothangId, request);
+  const balance = (posId) => t.ctx.services.transaction.posBalance(t.fothangId, { pos_id: posId, account_id: t.bcaId, date: '2026-01-05' }).saldo;
+  const [cuBefore, kfccBefore] = [balance(t.cuThanId), balance(t.kfccId)];
+  // Saldo per tanggal termasuk saldo awal pos: sama dengan saldo akhir di Laporan per Pos (semua baris Cu Than ≤ 05/01).
+  assert.equal(cuBefore, t.ctx.services.ledger.posSheet(t.fothangId, t.cuThanId, 2026).total_closing);
+  assert.notEqual(kfccBefore, 0, 'saldo awal KFCC ikut terhitung');
+
+  // Tanggal yang sama dengan baris mutasi "IURAN MABGI" (05/01): pindahan harus di bawahnya, seperti di file Laporan Keuangan.
+  t.ctx.services.transaction.transfer(t.fothangId, { date: '2026-01-05', account_id: t.bcaId, from_pos_id: t.cuThanId, to_pos_id: t.kfccId, amount: cuBefore });
+  const rows = t.ctx.services.ledger.posSheet(t.fothangId, t.cuThanId, 2026).months[0].rows;
+  assert.deepEqual(rows.map((r) => r.source), ['mutasi', 'mutasi', 'pindahan']);
+
+  assert.equal(balance(t.cuThanId), 0, '"semua saldo" mengosongkan pos asal');
+  assert.equal(balance(t.kfccId), kfccBefore + cuBefore);
+  assert.equal(t.ctx.services.ledger.tabel(t.fothangId, 2026).total, 1150, 'total akun tidak berubah');
+});
+
 test('pecah transaksi: total tetap, saldo draf tetap cocok, bisa digabung kembali', async () => {
   const t = createTestContext();
   const { request } = await importJanuary(t);
