@@ -200,7 +200,7 @@ function migrate(db) {
         db.exec('COMMIT');
       } catch (err) {
         db.exec('ROLLBACK');
-        throw new Error(`Migrasi database versi ${version + 1} gagal: ${err.message}`);
+        throw new Error(`Migrasi database versi ${version + 1} gagal: ${err.message}`, { cause: err });
       }
     }
   } finally {

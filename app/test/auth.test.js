@@ -16,7 +16,7 @@ async function startApp({ loginRequired = true } = {}) {
   const f1 = ctx.services.fothang.create({ code: 'SATU', name: 'Satu Fo Thang', start_date: '2026-01-01' });
   const f2 = ctx.services.fothang.create({ code: 'DUA', name: 'Dua Fo Thang', start_date: '2026-01-01' });
   const server = createServer(ctx, config);
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  await new Promise((resolve) => { server.listen(0, '127.0.0.1', resolve); });
   const base = `http://127.0.0.1:${server.address().port}`;
 
   /** Klien sederhana yang menyimpan cookie sesi seperti browser. */

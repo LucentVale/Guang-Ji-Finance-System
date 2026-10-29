@@ -3,7 +3,7 @@ title Sistem Keuangan Guang Ji
 cd /d "%~dp0"
 if not exist node_modules (
   echo Menginstal komponen, mohon tunggu...
-  call npm install
+  call npm install --omit=dev
 )
 start "" http://localhost:3000
 node server.js

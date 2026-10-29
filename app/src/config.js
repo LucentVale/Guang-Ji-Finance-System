@@ -12,7 +12,7 @@ function readLocalConfig() {
     return JSON.parse(fs.readFileSync(LOCAL_CONFIG_FILE, 'utf8'));
   } catch (err) {
     if (err.code === 'ENOENT') return {};
-    throw new Error(`File ${LOCAL_CONFIG_FILE} tidak valid: ${err.message}`);
+    throw new Error(`File ${LOCAL_CONFIG_FILE} tidak valid: ${err.message}`, { cause: err });
   }
 }
 

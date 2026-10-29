@@ -16,9 +16,10 @@ shell.CurrentDirectory = appDir
 
 If Not fso.FolderExists(appDir & "\data") Then fso.CreateFolder appDir & "\data"
 
-' Pertama kali dijalankan: pasang komponen (exceljs).
+' Pertama kali dijalankan: pasang komponen yang dibutuhkan aplikasi saja (exceljs).
+' --omit=dev: alat pengembang (ESLint) tidak ikut diunduh di komputer pemakai.
 If Not fso.FolderExists(appDir & "\node_modules") Then
-  shell.Run "cmd /c npm install", 1, True
+  shell.Run "cmd /c npm install --omit=dev", 1, True
 End If
 
 shell.Run "cmd /c node server.js >> data\server.log 2>&1", 0, False

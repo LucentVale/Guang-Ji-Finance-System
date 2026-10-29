@@ -79,7 +79,7 @@ function classify(row, aliasIndex) {
   const incoming = row.amount_cents > 0;
 
   let category = '';
-  let name = '';
+  let name; // diisi di setiap cabang di bawah
   let split = null;
   const sysCategory = systemCategory(row.bank_type, parts[1]);
   if (sysCategory) {

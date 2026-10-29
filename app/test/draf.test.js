@@ -123,7 +123,7 @@ test('ekspor DRAF: satu sheet bulan terakhir yang berisi data, apa pun bulan yan
   const { createServer } = require('../src/http/app');
   const t = createTestContext();
   const server = createServer(t.ctx, { ...baseConfig, host: '127.0.0.1', auth: { ...baseConfig.auth, loginRequired: false } });
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  await new Promise((resolve) => { server.listen(0, '127.0.0.1', resolve); });
   const url = `http://127.0.0.1:${server.address().port}/api/fothang/${t.fothangId}/export/draf.xlsx?account_id=${t.bcaId}&year=2026&month=10`;
   const sheetNames = async () => {
     const wb = new ExcelJS.Workbook();

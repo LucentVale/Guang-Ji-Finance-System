@@ -2,7 +2,6 @@
 // Data bulan yang dipilih DIGANTI dengan isi file (bukan ditambahkan), supaya tidak dobel dengan hasil impor mutasi.
 import { $, $$, html, render, on } from '../core/dom.js';
 import { api } from '../core/api.js';
-import { store } from '../core/store.js';
 import { money, dateId, MONTHS } from '../core/format.js';
 import { openModal, attempt, toast } from './feedback.js';
 import { accountOptions, posOptions } from './options.js';

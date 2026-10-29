@@ -28,7 +28,7 @@ function positiveCents(rupiah, label = 'Nominal') {
  * Mengembalikan null bila teks bukan angka.
  */
 function parseBankAmount(text) {
-  const raw = String(text ?? '').replace(/ /g, ' ').trim().toUpperCase();
+  const raw = String(text ?? '').replace(/\u00a0/g, ' ').trim().toUpperCase();
   const isDebit = raw.endsWith('DB');
   const digits = raw.replace(/(CR|DB)$/, '').replace(/,/g, '').trim();
   if (!digits) return null;
