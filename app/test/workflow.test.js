@@ -105,6 +105,23 @@ test('pindahan: tampil paling bawah pada tanggalnya, dan saldo pos per tanggal i
   assert.equal(t.ctx.services.ledger.tabel(t.fothangId, 2026).total, 1150, 'total akun tidak berubah');
 });
 
+test('dashboard per bulan: saldo awal + masuk - keluar + pindahan = saldo akhir tiap bulan', async () => {
+  const t = createTestContext();
+  const { request } = await importJanuary(t);
+  t.ctx.services.imports.commit(t.fothangId, request);
+  t.ctx.services.transaction.create(t.fothangId, { date: '2026-02-03', account_id: t.bcaId, pos_id: t.cuThanId, name: 'Donasi Feb', masuk: 70 });
+  t.ctx.services.transaction.transfer(t.fothangId, { date: '2026-02-10', account_id: t.bcaId, from_pos_id: t.cuThanId, to_pos_id: t.kfccId, amount: 25 });
+
+  const d = t.ctx.services.dashboard.pos(t.fothangId, t.cuThanId, 2026);
+  let saldo = d.opening;
+  for (const m of d.months.slice(0, d.last_month)) {
+    saldo = Math.round((saldo + m.masuk - m.keluar + m.pindahan) * 100) / 100;
+    assert.equal(m.saldo, saldo, `bulan ${m.month}`);
+  }
+  assert.deepEqual([d.months[1].masuk, d.months[1].keluar, d.months[1].pindahan], [70, 0, -25]);
+  assert.equal(d.months.reduce((s, m) => s + m.masuk, 0), d.masuk);
+});
+
 test('pecah transaksi: total tetap, saldo draf tetap cocok, bisa digabung kembali', async () => {
   const t = createTestContext();
   const { request } = await importJanuary(t);
@@ -173,7 +190,8 @@ test('dashboard: total cocok dengan per pos, pindahan tidak dihitung sebagai mas
   assert.equal(o.pos.reduce((s, p) => s + p.closing, 0), o.totals.saldo);
   const kfcc = o.pos.find((p) => p.code === 'KFCC');
   assert.deepEqual([kfcc.opening, kfcc.masuk, kfcc.keluar, kfcc.pindahan, kfcc.closing], [400, 50, 0, 100, 550]);
-  assert.deepEqual(o.months[0], { month: 1, masuk: 350, keluar: 200, saldo: 1150, count: 5 });
+  // pindahan di tingkat Fothang selalu 0: keluar dari satu pos, masuk ke pos lain.
+  assert.deepEqual(o.months[0], { month: 1, masuk: 350, keluar: 200, pindahan: 0, saldo: 1150, count: 5 });
   assert.equal(o.months[1].saldo, null, 'bulan tanpa data tidak digambar');
 
   const cu = t.ctx.services.dashboard.pos(t.fothangId, t.cuThanId, 2026);

@@ -86,6 +86,7 @@ module.exports = function dashboardService({ repos, services }) {
         month: i + 1,
         masuk: toRupiah(sum(inMonth.filter(isIn))),
         keluar: outflow(inMonth),
+        pindahan: toRupiah(sum(inMonth.filter(isTransfer))),
         saldo: closing[i] == null ? null : toRupiah(closing[i]),
         count: inMonth.length,
       };

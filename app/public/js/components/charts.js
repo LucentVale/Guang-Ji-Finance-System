@@ -1,6 +1,7 @@
 // Grafik SVG sederhana untuk Dashboard (tanpa library luar).
 // Aturan tampilan (lihat panduan data-viz): ujung batang membulat 4px dengan pangkal rata, garis 2px,
-// grid tipis & samar, teks memakai warna teks (bukan warna seri), satu seri per grafik, dan tooltip saat kursor diarahkan.
+// grid tipis & samar, teks memakai warna teks (bukan warna seri), satu seri per grafik (kecuali Pemasukan vs
+// Pengeluaran, yang diberi legenda), dan tooltip saat kursor diarahkan.
 // Batang horizontal maksimal 24px; batang "mini" di kartu ringkasan sengaja lebih lebar mengikuti desain referensi.
 import { html, raw, escapeHtml } from '../core/dom.js';
 import { money, MONTHS } from '../core/format.js';
@@ -110,6 +111,48 @@ export function miniBarChart(months, field, { lastMonth, tone = 'accent', label 
   });
   return html`<svg viewBox="0 0 ${MW} ${H}" class="chart mini" role="img" aria-label="${label} per bulan">${raw(marks)}</svg>`;
 }
+
+/**
+ * Pemasukan vs pengeluaran per bulan: dua batang berdampingan tiap bulan (Jan–Des).
+ * Dua seri, jadi kartu pemakainya wajib menampilkan legenda (lihat flowLegend).
+ * Bulan sesudah lastMonth hanya diberi label (belum ada data). Area tiap bulan bisa diklik (data-month).
+ * @param {{month:number, masuk:number, keluar:number}[]} months data 12 bulan
+ */
+export function monthlyFlowChart(months, { lastMonth }) {
+  const H = 260;
+  const pad = { l: 64, r: 12, t: 12, b: 28 };
+  const shown = months.filter((m) => m.month <= lastMonth);
+  if (!shown.length) return html`<p class="muted empty">Belum ada data.</p>`;
+  const scale = niceScale(0, Math.max(...shown.map((m) => Math.max(m.masuk, m.keluar)), 1));
+  const y = (v) => pad.t + (H - pad.t - pad.b) * (1 - (v - scale.lo) / (scale.hi - scale.lo));
+  const band = (W - pad.l - pad.r) / 12;
+  const bw = Math.min(BAR_MAX - 6, (band - 10) / 2);
+  const base = y(0);
+
+  let marks = '';
+  months.forEach((m) => {
+    const left = pad.l + band * (m.month - 1);
+    const x = left + (band - (bw * 2 + 2)) / 2;
+    marks += `<text x="${left + band / 2}" y="${H - 8}" class="tick${m.month > lastMonth ? ' future' : ''}" text-anchor="middle">${MONTHS[m.month - 1].slice(0, 3)}</text>`;
+    if (m.month > lastMonth) return;
+    [[m.masuk, COLORS.accent, 0], [m.keluar, COLORS.ink, bw + 2]].forEach(([v, color, dx]) => {
+      if (v > 0) marks += `<path d="${columnPath(x + dx, bw, base, Math.min(y(v), base - 2))}" fill="${color}"/>`;
+    });
+    const selisih = Math.round((m.masuk - m.keluar) * 100) / 100;
+    marks += `<rect x="${left}" y="${pad.t}" width="${band}" height="${H - pad.t - pad.b}" class="hit" data-month="${m.month}"
+      data-tip="${tip(MONTHS[m.month - 1], [['Pemasukan', m.masuk], ['Pengeluaran', m.keluar], ['Selisih', selisih]])}"/>`;
+  });
+
+  return html`
+    <svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Pemasukan dan pengeluaran per bulan">
+      ${raw(gridAndAxis(scale, y, pad.l, W - pad.r))}
+      ${raw(marks)}
+    </svg>`;
+}
+
+/** Legenda dua seri untuk monthlyFlowChart (warna + teks, tidak hanya warna). */
+export const flowLegend = () => html`
+  <span class="legend"><span><i style="background:${COLORS.accent}"></i>Pemasukan</span><span><i style="background:${COLORS.ink}"></i>Pengeluaran</span></span>`;
 
 /**
  * Garis saldo per bulan (satu seri; judul kartu sudah menyebutkan isinya, jadi tanpa legenda).

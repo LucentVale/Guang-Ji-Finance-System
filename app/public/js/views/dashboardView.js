@@ -6,7 +6,7 @@ import { $, html, render, on } from '../core/dom.js';
 import { api } from '../core/api.js';
 import { store } from '../core/store.js';
 import { money, numClass, rupiah, dateId, dateShort, MONTHS } from '../core/format.js';
-import { miniBarChart, balanceLineChart, rankedBarChart, sparkline, attachTooltips } from '../components/charts.js';
+import { miniBarChart, balanceLineChart, rankedBarChart, sparkline, attachTooltips, monthlyFlowChart, flowLegend } from '../components/charts.js';
 
 const throughLabel = (lastMonth) => (lastMonth ? `Data s.d. ${MONTHS[lastMonth - 1]} ${store.year}` : `Belum ada data ${store.year}`);
 
@@ -70,6 +70,8 @@ export async function dashboardView(main, params) {
   attachTooltips(dash);
   // Baris tabel (data-pos) dan batang "Saldo per pos" (data-id) membuka rincian pos.
   on(dash, 'click', '[data-pos], [data-id]', (e, el) => (location.hash = `#/dashboard?pos=${el.dataset.pos ?? el.dataset.id}`));
+  // Rincian satu pos: bulan (baris tabel / batang grafik per bulan) membuka bulan itu di Laporan per Pos.
+  if (detail) on(dash, 'click', '[data-month]', (e, el) => (location.hash = `#/tahunan?sheet=${detail.pos.id}&bulan=${el.dataset.month}`));
 }
 
 // ---------------------------------------------------------------- Bagian-bagian kartu
@@ -124,6 +126,47 @@ function donorCard(donors) {
     </ol>` : html`<p class="muted empty">Belum ada data donatur.</p>`);
 }
 
+/**
+ * Pemasukan & pengeluaran setiap bulan: grafik batang berpasangan + tabel.
+ * Tiap baris: saldo awal + pemasukan − pengeluaran + pindahan = saldo akhir.
+ * Kolom Pindahan hanya tampil bila ada (di ringkasan semua pos nilainya selalu 0).
+ * @param {{months: object[], lastMonth: number, opening: number, clickable: boolean}} p
+ */
+function monthlyCard({ months, lastMonth, opening, clickable }) {
+  const shown = months.filter((m) => m.month <= lastMonth);
+  const showTransfer = shown.some((m) => m.pindahan);
+  const total = (field) => Math.round(shown.reduce((s, m) => s + m[field] * 100, 0)) / 100;
+  const selisih = (m) => Math.round((m.masuk - m.keluar) * 100) / 100;
+  const openingOf = (i) => (i ? shown[i - 1].saldo : opening);
+  const sub = clickable ? 'Klik bulan untuk membuka transaksinya di Laporan per Pos' : 'Semua pos · pindahan antar pos tidak dihitung';
+
+  return card('Pemasukan & Pengeluaran per bulan', sub, shown.length ? html`
+    <div class="monthly-legend">${flowLegend()}</div>
+    <div class="monthly-body">
+    <div>${monthlyFlowChart(months, { lastMonth })}</div>
+    <div class="table-wrap flat"><table class="table monthly-table">
+      <thead><tr><th>Bulan</th><th class="num">Saldo awal</th><th class="num">Pemasukan</th><th class="num">Pengeluaran</th>
+        ${showTransfer ? html`<th class="num">Pindahan</th>` : ''}<th class="num">Selisih</th><th class="num">Saldo akhir</th></tr></thead>
+      <tbody>${shown.map((m, i) => html`
+        <tr class="${clickable ? 'clickable' : ''}" ${clickable ? html`data-month="${m.month}" title="Buka ${MONTHS[m.month - 1]} di Laporan per Pos"` : ''}>
+          <td><b>${MONTHS[m.month - 1]}</b></td>
+          <td class="${numClass(openingOf(i))}">${money(openingOf(i))}</td>
+          <td class="num in">${m.masuk ? money(m.masuk) : '–'}</td>
+          <td class="num out">${m.keluar ? money(m.keluar) : '–'}</td>
+          ${showTransfer ? html`<td class="${numClass(m.pindahan)}">${m.pindahan ? `${m.pindahan > 0 ? '+' : ''}${money(m.pindahan)}` : ''}</td>` : ''}
+          <td class="${numClass(selisih(m))}">${selisih(m) > 0 ? '+' : ''}${money(selisih(m))}</td>
+          <td class="${numClass(m.saldo)}"><b>${money(m.saldo)}</b></td>
+        </tr>`)}
+      </tbody>
+      <tfoot><tr><td>Total ${store.year}</td><td class="${numClass(opening)}">${money(opening)}</td>
+        <td class="num">${money(total('masuk'))}</td><td class="num">${money(total('keluar'))}</td>
+        ${showTransfer ? html`<td class="${numClass(total('pindahan'))}">${money(total('pindahan'))}</td>` : ''}
+        <td class="${numClass(total('masuk') - total('keluar'))}">${money(Math.round((total('masuk') - total('keluar')) * 100) / 100)}</td>
+        <td class="${numClass(shown.at(-1).saldo)}">${money(shown.at(-1).saldo)}</td></tr></tfoot>
+    </table></div>
+    </div>` : html`<p class="muted empty">Belum ada transaksi di ${store.year}.</p>`, clickable ? 'monthly' : 'monthly static');
+}
+
 // ---------------------------------------------------------------- Semua pos
 
 function overviewSection(o) {
@@ -144,6 +187,8 @@ function overviewSection(o) {
         ${flowCard('Total Pengeluaran', t.keluar, o.months, o.last_month, 'keluar', 'ink', false)}
       </div>
     </div>
+
+    ${monthlyCard({ months: o.months, lastMonth: o.last_month, opening: t.opening, clickable: false })}
 
     <div class="dash-grid">
       ${card('Saldo total per bulan', 'Saldo akhir bulan, semua pos', balanceLineChart(o.months, { label: 'Saldo total' }))}
@@ -187,6 +232,7 @@ function posSection(d) {
         ${flowCard('Total Pengeluaran', d.keluar, d.months, d.last_month, 'keluar', 'ink', false)}
       </div>
     </div>
+    ${monthlyCard({ months: d.months, lastMonth: d.last_month, opening: d.opening, clickable: true })}
     <div class="dash-grid">
       ${card(`Saldo ${d.pos.name} per bulan`, 'Saldo akhir bulan', balanceLineChart(d.months, { label: `Saldo ${d.pos.name}` }))}
     </div>
