@@ -116,10 +116,9 @@ export function miniBarChart(months, field, { lastMonth, tone = 'accent', label 
  * Pemasukan vs pengeluaran per bulan: dua batang berdampingan tiap bulan (Jan–Des).
  * Dua seri, jadi kartu pemakainya wajib menampilkan legenda (lihat flowLegend).
  * Bulan sesudah lastMonth hanya diberi label (belum ada data). Area tiap bulan bisa diklik (data-month).
- * selected = bulan yang sedang dipilih: batangnya tetap berwarna penuh, bulan lain dibuat lembut.
  * @param {{month:number, masuk:number, keluar:number}[]} months data 12 bulan
  */
-export function monthlyFlowChart(months, { lastMonth, selected = null }) {
+export function monthlyFlowChart(months, { lastMonth }) {
   const H = 260;
   const pad = { l: 64, r: 12, t: 12, b: 28 };
   const shown = months.filter((m) => m.month <= lastMonth);
@@ -136,8 +135,7 @@ export function monthlyFlowChart(months, { lastMonth, selected = null }) {
     const x = left + (band - (bw * 2 + 2)) / 2;
     marks += `<text x="${left + band / 2}" y="${H - 8}" class="tick${m.month > lastMonth ? ' future' : ''}" text-anchor="middle">${MONTHS[m.month - 1].slice(0, 3)}</text>`;
     if (m.month > lastMonth) return;
-    const dim = selected && m.month !== selected;
-    [[m.masuk, dim ? COLORS.accentMuted : COLORS.accent, 0], [m.keluar, dim ? COLORS.inkMuted : COLORS.ink, bw + 2]].forEach(([v, color, dx]) => {
+    [[m.masuk, COLORS.accent, 0], [m.keluar, COLORS.ink, bw + 2]].forEach(([v, color, dx]) => {
       if (v > 0) marks += `<path d="${columnPath(x + dx, bw, base, Math.min(y(v), base - 2))}" fill="${color}"/>`;
     });
     const selisih = Math.round((m.masuk - m.keluar) * 100) / 100;
@@ -147,6 +145,39 @@ export function monthlyFlowChart(months, { lastMonth, selected = null }) {
 
   return html`
     <svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Pemasukan dan pengeluaran per bulan">
+      ${raw(gridAndAxis(scale, y, pad.l, W - pad.r))}
+      ${raw(marks)}
+    </svg>`;
+}
+
+/**
+ * Arus kas harian satu bulan: pemasukan & pengeluaran berdampingan per tanggal (dashboard Per Bulan).
+ * Label tanggal ditulis tiap 5 hari supaya tidak berdesakan; tooltip memuat saldo akhir hari itu.
+ * @param {{day:number, masuk:number, keluar:number, saldo:number, count:number}[]} days
+ */
+export function dailyFlowChart(days, { monthName }) {
+  const H = 240;
+  const pad = { l: 64, r: 8, t: 12, b: 26 };
+  if (!days.some((d) => d.masuk || d.keluar)) return html`<p class="muted empty">Belum ada pemasukan/pengeluaran di bulan ini.</p>`;
+  const scale = niceScale(0, Math.max(...days.map((d) => Math.max(d.masuk, d.keluar)), 1));
+  const y = (v) => pad.t + (H - pad.t - pad.b) * (1 - (v - scale.lo) / (scale.hi - scale.lo));
+  const band = (W - pad.l - pad.r) / days.length;
+  const bw = Math.max(2, Math.min(8, (band - 3) / 2));
+  const base = y(0);
+
+  let marks = '';
+  days.forEach((d) => {
+    const left = pad.l + band * (d.day - 1);
+    const x = left + (band - (bw * 2 + 1)) / 2;
+    if (d.masuk > 0) marks += `<path d="${columnPath(x, bw, base, Math.min(y(d.masuk), base - 2))}" fill="${COLORS.accent}"/>`;
+    if (d.keluar > 0) marks += `<path d="${columnPath(x + bw + 1, bw, base, Math.min(y(d.keluar), base - 2))}" fill="${COLORS.ink}"/>`;
+    if (d.day === 1 || d.day % 5 === 0) marks += `<text x="${left + band / 2}" y="${H - 8}" class="tick" text-anchor="middle">${d.day}</text>`;
+    marks += `<rect x="${left}" y="${pad.t}" width="${band}" height="${H - pad.t - pad.b}" class="hit" data-day="${d.day}"
+      data-tip="${tip(`${d.day} ${monthName} · ${d.count} transaksi`, [['Pemasukan', d.masuk], ['Pengeluaran', d.keluar], ['Saldo akhir hari', d.saldo]])}"/>`;
+  });
+
+  return html`
+    <svg viewBox="0 0 ${W} ${H}" class="chart" role="img" aria-label="Pemasukan dan pengeluaran per hari">
       ${raw(gridAndAxis(scale, y, pad.l, W - pad.r))}
       ${raw(marks)}
     </svg>`;

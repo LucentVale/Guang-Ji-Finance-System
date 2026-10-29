@@ -17,6 +17,12 @@ function sourceBadge(rows) {
   return Object.entries(counts).map(([src, n]) => html`<span class="badge">${n} baris dari ${label[src] || src}</span>`);
 }
 
+/** Bulan terakhir (1-12) di tahun terpilih yang punya transaksi di akun ini, atau 0 bila belum ada. */
+async function lastMonthWithData(accountId) {
+  const rows = await api.get('/transactions', { year: store.year, account_id: accountId });
+  return rows.reduce((m, t) => Math.max(m, Number(t.date.slice(5, 7))), 0);
+}
+
 export async function drafView(main, params) {
   const month = Number(params.get('month')) || defaultMonth();
   const accountId = Number(params.get('account_id')) || store.accounts[0]?.id;
@@ -28,6 +34,12 @@ export async function drafView(main, params) {
   };
 
   const draf = await api.get('/draf', { account_id: accountId, year: store.year, month });
+  // Dibuka tanpa bulan (menu samping / tautan dashboard lama) dan bulan berjalan masih kosong:
+  // langsung tampilkan bulan terakhir yang berisi data, supaya pengguna tidak perlu mengganti bulan dulu.
+  if (!params.get('month') && !draf.rows.length) {
+    const latest = await lastMonthWithData(accountId);
+    if (latest && latest !== month) return void location.replace(`#/draf?month=${latest}&account_id=${accountId}${onlyUnallocated ? '&filter=none' : ''}`);
+  }
   const unallocated = draf.rows.filter((r) => !r.pos_id).length;
   const mismatched = draf.rows.filter((r) => r.match === false).length;
   const rows = onlyUnallocated ? draf.rows.filter((r) => !r.pos_id) : draf.rows;

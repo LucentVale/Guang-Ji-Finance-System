@@ -143,6 +143,13 @@ test('dashboard satu bulan: kartu & ringkasan pos hanya bulan itu, saldo awal = 
   assert.deepEqual([cuFeb.opening, cuFeb.masuk, cuFeb.keluar, cuFeb.closing], [cuYear.months[0].saldo, 70, 30, cuYear.months[1].saldo]);
   const cuRow = feb.pos.find((p) => p.pos_id === t.cuThanId);
   assert.deepEqual([cuRow.opening, cuRow.masuk, cuRow.keluar, cuRow.closing], [cuFeb.opening, 70, 30, cuFeb.closing]);
+
+  // Arus kas harian: 28 hari Februari, jumlahnya = total bulan, saldo hari terakhir = saldo akhir bulan.
+  assert.equal(cuFeb.days.length, 28);
+  assert.deepEqual(cuFeb.days.filter((d) => d.masuk || d.keluar).map((d) => [d.day, d.masuk, d.keluar]), [[3, 70, 0], [4, 0, 30]]);
+  assert.equal(cuFeb.days.at(-1).saldo, cuFeb.closing);
+  assert.equal(feb.days.at(-1).saldo, feb.totals.saldo);
+  assert.equal(year.days, null, 'tanpa bulan tidak ada data harian');
 });
 
 test('pecah transaksi: total tetap, saldo draf tetap cocok, bisa digabung kembali', async () => {

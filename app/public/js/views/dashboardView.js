@@ -1,31 +1,17 @@
-// Dashboard: ringkasan total Fothang dan rincian per pos untuk tahun terpilih.
-// Tata letak mengikuti desain referensi: kartu saldo gelap & donatur (kiri), transaksi terbaru (tengah),
-// kartu Total Pemasukan & Total Pengeluaran dengan grafik batang kecil (kanan), lalu tren saldo & ringkasan per pos.
-// ?pos=<id> menampilkan rincian satu pos; tanpa parameter menampilkan ringkasan semua pos.
-// Dua jenis dashboard (tab di kepala halaman):
-//   Keseluruhan — setahun penuh (tanpa ?bulan).
-//   Per Bulan   — ?bulan=<1-12>: kartu, transaksi terbaru, donatur, dan pemasukan/pengeluaran tiap pos hanya bulan itu;
-//                 tabel "per bulan" tetap setahun sebagai pembanding (bulan terpilih disorot).
+// Dashboard. Dua jenis (tab di kepala halaman), masing-masing untuk semua pos atau satu pos (?pos=<id>):
+//   Keseluruhan — setahun penuh (file ini). Tata letak mengikuti desain referensi: kartu saldo gelap & donatur (kiri),
+//                 transaksi terbaru (tengah), Total Pemasukan & Total Pengeluaran dengan grafik batang kecil (kanan),
+//                 lalu pemasukan & pengeluaran per bulan, tren saldo, dan ringkasan per pos.
+//   Per Bulan   — ?bulan=<1-12>: dashboard khusus satu bulan (views/dashboardMonth.js).
 import { $, html, render, on } from '../core/dom.js';
 import { api } from '../core/api.js';
 import { store } from '../core/store.js';
 import { money, numClass, rupiah, dateId, dateShort, MONTHS } from '../core/format.js';
-import { miniBarChart, balanceLineChart, rankedBarChart, sparkline, attachTooltips, monthlyFlowChart, flowLegend } from '../components/charts.js';
+import { miniBarChart, balanceLineChart, rankedBarChart, attachTooltips, monthlyFlowChart, flowLegend } from '../components/charts.js';
+import { bigMoney, card, donorCard, posSummaryCard, initials, minus, signed } from '../components/dashboardCards.js';
+import { renderMonthDashboard } from './dashboardMonth.js';
 
-const throughLabel = (lastMonth, month = null) => {
-  if (month) return `Data bulan ${MONTHS[month - 1]} ${store.year}`;
-  return lastMonth ? `Data s.d. ${MONTHS[lastMonth - 1]} ${store.year}` : `Belum ada data ${store.year}`;
-};
-
-/** Label periode untuk judul kartu: "April" atau "" (setahun). */
-const periodLabel = (month) => (month ? MONTHS[month - 1] : '');
-
-/** Angka besar dengan sen dibuat samar, mis. "Rp 327.994.469" + ",24". */
-function bigMoney(n) {
-  if (n == null) return html`<span class="muted">—</span>`;
-  const [whole, cents] = money(Math.abs(n)).split(',');
-  return html`<span class="${n < 0 ? 'neg' : ''}">${n < 0 ? '−' : ''}Rp ${whole}<span class="cents">,${cents}</span></span>`;
-}
+const throughLabel = (lastMonth) => (lastMonth ? `Data s.d. ${MONTHS[lastMonth - 1]} ${store.year}` : `Belum ada data ${store.year}`);
 
 /** Perubahan bulan terakhir vs bulan sebelumnya (ikon + teks, tidak hanya warna). */
 function changePill(months, lastMonth, field, { upIsGood }) {
@@ -50,18 +36,16 @@ function bankStatus(t) {
 /** Keterangan kecil di bawah nama: kategori (mis. PELITA), atau nama pos bila kategorinya tidak menambah informasi. */
 const subLabel = (r) => (r.category && r.category !== 'DONATUR' && r.category !== String(r.name).toUpperCase() ? r.category : r.pos_name);
 
-const initials = (text) => String(text || '?').replace(/[^A-Za-z ]/g, ' ').trim().split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '#';
-
-const card = (title, sub, body, cls = '') => html`
-  <section class="dcard ${cls}"><header><div><h2>${title}</h2>${sub ? html`<p>${sub}</p>` : ''}</div></header>${body}</section>`;
-
-/** Hash dashboard untuk kombinasi pos & bulan (keduanya opsional). */
+/** Hash dashboard untuk kombinasi pos & bulan (keduanya opsional; tanpa bulan = Keseluruhan). */
 function dashboardHash(posId, month) {
   const q = new URLSearchParams();
   if (posId) q.set('pos', String(posId));
   if (month) q.set('bulan', String(month));
   return `#/dashboard${q.size ? `?${q}` : ''}`;
 }
+
+/** Gambar ulang halaman (mis. setelah transaksi diubah dari dashboard Per Bulan). */
+const rerenderView = () => window.dispatchEvent(new HashChangeEvent('hashchange'));
 
 export async function dashboardView(main, params) {
   const posId = Number(params.get('pos')) || null;
@@ -76,11 +60,14 @@ export async function dashboardView(main, params) {
   const month = askMonth && askMonth <= overview.last_month ? askMonth : null;
   if (askMonth && !month) return void location.replace(dashboardHash(posId, null));
 
+  const sub = month
+    ? `Dashboard bulan ${MONTHS[month - 1]} ${store.year} · pindahan antar pos tidak dihitung sebagai pemasukan/pengeluaran.`
+    : `${throughLabel(overview.last_month)} · Pindahan antar pos tidak dihitung sebagai pemasukan/pengeluaran.`;
   render(main, html`
     <div class="view-head">
       <div>
-        <h1>${detail ? detail.pos.name : 'Dashboard'}</h1>
-        <p class="sub">${throughLabel(overview.last_month, month)} · Pindahan antar pos tidak dihitung sebagai pemasukan/pengeluaran.</p>
+        <h1>${detail ? detail.pos.name : 'Dashboard'}${month ? html` <span class="title-month">${MONTHS[month - 1]} ${store.year}</span>` : ''}</h1>
+        <p class="sub">${sub}</p>
       </div>
       <div class="view-filters">
         <div class="segmented" role="tablist" aria-label="Jenis dashboard">
@@ -96,7 +83,7 @@ export async function dashboardView(main, params) {
       </div>
     </div>
     ${month ? monthStrip(overview.last_month, month) : ''}
-    <div id="dash">${detail ? posSection(detail, month) : overviewSection(overview, month)}</div>`);
+    <div id="dash">${month ? html`<div class="empty">Memuat…</div>` : detail ? posSection(detail) : overviewSection(overview)}</div>`);
 
   $('#posFilter', main).addEventListener('change', (e) => (location.hash = dashboardHash(e.target.value, month)));
   // Keseluruhan = setahun; Per Bulan dimulai dari bulan terakhir yang berisi data.
@@ -105,7 +92,7 @@ export async function dashboardView(main, params) {
   }));
   const dash = $('#dash', main);
   attachTooltips(dash);
-  // Baris tabel (data-pos) dan batang "Saldo per pos" (data-id) membuka rincian pos.
+  // Baris "per pos" (data-pos) dan batang "Saldo per pos" (data-id) membuka rincian pos, di jenis dashboard yang sama.
   on(dash, 'click', '[data-pos], [data-id]', (e, el) => (location.hash = dashboardHash(el.dataset.pos ?? el.dataset.id, month)));
   // Bulan (tombol bulan, baris tabel / batang grafik per bulan) membuka dashboard Per Bulan untuk bulan itu.
   // (dipasang pada elemen halaman ini, bukan `main`, yang dipakai ulang tiap pindah halaman)
@@ -113,6 +100,8 @@ export async function dashboardView(main, params) {
   on(dash, 'click', '[data-month]', goMonth);
   const strip = $('.month-strip', main);
   if (strip) on(strip, 'click', '[data-month]', goMonth);
+
+  if (month) await renderMonthDashboard(dash, { data: detail || overview, month, posId, overview, onChanged: rerenderView });
 }
 
 /** Deretan tombol bulan untuk dashboard Per Bulan (hanya bulan yang sudah berisi data). */
@@ -126,7 +115,7 @@ function monthStrip(lastMonth, month) {
     </nav>`;
 }
 
-// ---------------------------------------------------------------- Bagian-bagian kartu
+// ---------------------------------------------------------------- Bagian-bagian kartu (Keseluruhan)
 
 /** Kartu gelap saldo utama (seperti "Total Balance" di desain referensi). */
 function balanceHero({ title, subtitle, amount, inner }) {
@@ -145,32 +134,19 @@ function balanceHero({ title, subtitle, amount, inner }) {
     </section>`;
 }
 
-/**
- * Kartu Pemasukan / Pengeluaran: total periode + grafik 6 bulan.
- * focusMonth = bulan yang disorot & dibandingkan dengan bulan sebelumnya (bulan terpilih, atau bulan terakhir berisi data).
- */
-function flowCard({ title, total, months, focusMonth, field, tone, upIsGood }) {
+/** Kartu Total Pemasukan / Total Pengeluaran: total setahun + grafik 6 bulan terakhir. */
+function flowCard(title, total, months, lastMonth, field, tone, upIsGood) {
   return html`
     <section class="dcard flow">
       <header><div><h2>${title}</h2></div></header>
-      <div class="flow-total">${bigMoney(total)} ${changePill(months, focusMonth, field, { upIsGood })}</div>
-      ${miniBarChart(months, field, { lastMonth: focusMonth, tone, label: title })}
+      <div class="flow-total">${bigMoney(total)} ${changePill(months, lastMonth, field, { upIsGood })}</div>
+      ${miniBarChart(months, field, { lastMonth, tone, label: title })}
     </section>`;
 }
 
-/** Kedua kartu arus kas (kolom kanan) untuk periode setahun atau satu bulan. */
-function flowCards(data, total, month) {
-  const p = periodLabel(month);
-  const common = { months: data.months, focusMonth: month || data.last_month };
-  return html`
-    ${flowCard({ ...common, title: p ? `Pemasukan ${p}` : 'Total Pemasukan', total: total.masuk, field: 'masuk', tone: 'accent', upIsGood: true })}
-    ${flowCard({ ...common, title: p ? `Pengeluaran ${p}` : 'Total Pengeluaran', total: total.keluar, field: 'keluar', tone: 'ink', upIsGood: false })}`;
-}
-
-function recentCard(rows, { showPos = true, month = null } = {}) {
-  const sub = month ? `Transaksi terakhir di bulan ${MONTHS[month - 1]}` : 'Transaksi paling akhir yang tercatat';
-  const empty = month ? `Belum ada transaksi di ${MONTHS[month - 1]} ${store.year}.` : `Belum ada transaksi di ${store.year}.`;
-  return card('Transaksi terbaru', sub, html`
+/** @param {{showPos?: boolean, lastMonth: number}} options lastMonth = bulan terakhir berisi data (dibuka di Draf) */
+function recentCard(rows, { showPos = true, lastMonth }) {
+  return card('Transaksi terbaru', 'Transaksi paling akhir yang tercatat', html`
     ${rows.length ? html`
       <div class="tx-list ${showPos ? '' : 'no-pos'}">
         <div class="tx-row tx-head"><span>Nama</span><span>Tanggal</span>${showPos ? html`<span>Pos</span>` : ''}<span class="num">Jumlah</span></div>
@@ -182,55 +158,44 @@ function recentCard(rows, { showPos = true, month = null } = {}) {
             ${showPos ? html`<span><span class="pos-pill">${r.pos || '—'}</span></span>` : ''}
             <span class="num tx-amount ${r.amount < 0 ? 'out' : 'in'}">${r.amount < 0 ? '−' : '+'} ${money(Math.abs(r.amount))}</span>
           </div>`)}
-      </div>` : html`<p class="muted empty">${empty}</p>`}
-    <div class="card-foot"><a class="btn" href="#/draf${month ? `?month=${month}` : ''}">Lihat semua di Draf</a></div>`, 'recent');
-}
-
-function donorCard(donors, month = null) {
-  const sub = month ? `Bulan ${MONTHS[month - 1]} · pos yang memakai Daftar Donatur` : 'Dari pos yang memakai Daftar Donatur';
-  return card('Donatur terbesar', sub, donors.length ? html`
-    <ol class="donor-list">${donors.slice(0, 6).map((d) => html`
-      <li><i class="tx-avatar" aria-hidden="true">${initials(d.label)}</i><span>${d.label}</span><b class="num">${money(d.amount)}</b></li>`)}
-    </ol>` : html`<p class="muted empty">Belum ada data donatur${month ? ' di bulan ini' : ''}.</p>`);
+      </div>` : html`<p class="muted empty">Belum ada transaksi di ${store.year}.</p>`}
+    <div class="card-foot"><a class="btn" href="#/draf${lastMonth ? `?month=${lastMonth}` : ''}">Lihat semua di Draf</a></div>`, 'recent');
 }
 
 /**
- * Pemasukan & pengeluaran setiap bulan (selalu setahun): grafik batang berpasangan + tabel.
+ * Pemasukan & pengeluaran setiap bulan: grafik batang berpasangan + tabel.
  * Tiap baris: saldo awal + pemasukan − pengeluaran + pindahan = saldo akhir.
- * Kolom Pindahan hanya tampil bila ada (di ringkasan semua pos nilainya selalu 0).
- * @param {{months: object[], lastMonth: number, opening: number, selected: number|null, hint: string}} p
- *   opening = saldo awal TAHUN; selected = bulan yang sedang dipilih (disorot); hint = arti klik pada bulan
+ * Kolom Pindahan hanya tampil bila ada (di ringkasan semua pos nilainya selalu 0). Klik bulan = dashboard Per Bulan.
+ * @param {{months: object[], lastMonth: number, opening: number}} p opening = saldo awal tahun
  */
-function monthlyCard({ months, lastMonth, opening, selected, hint }) {
+function monthlyCard({ months, lastMonth, opening }) {
   const shown = months.filter((m) => m.month <= lastMonth);
   const showTransfer = shown.some((m) => m.pindahan);
   const total = (field) => Math.round(shown.reduce((s, m) => s + m[field] * 100, 0)) / 100;
-  const selisih = (m) => Math.round((m.masuk - m.keluar) * 100) / 100;
   const openingOf = (i) => (i ? shown[i - 1].saldo : opening);
 
-  return card('Pemasukan & Pengeluaran per bulan', hint, shown.length ? html`
+  return card('Pemasukan & Pengeluaran per bulan', 'Klik bulan untuk membuka dashboard Per Bulan', shown.length ? html`
     <div class="monthly-legend">${flowLegend()}</div>
     <div class="monthly-body">
-    <div>${monthlyFlowChart(months, { lastMonth, selected })}</div>
+    <div>${monthlyFlowChart(months, { lastMonth })}</div>
     <div class="table-wrap flat"><table class="table monthly-table">
       <thead><tr><th>Bulan</th><th class="num">Saldo awal</th><th class="num">Pemasukan</th><th class="num">Pengeluaran</th>
         ${showTransfer ? html`<th class="num">Pindahan</th>` : ''}<th class="num">Selisih</th><th class="num">Saldo akhir</th></tr></thead>
       <tbody>${shown.map((m, i) => html`
-        <tr class="clickable ${m.month === selected ? 'selected' : ''}" data-month="${m.month}" title="${MONTHS[m.month - 1]}: ${hint}"
-          ${m.month === selected ? 'aria-current="true"' : ''}>
+        <tr class="clickable" data-month="${m.month}" title="Buka dashboard ${MONTHS[m.month - 1]}">
           <td><b>${MONTHS[m.month - 1]}</b></td>
           <td class="${numClass(openingOf(i))}">${money(openingOf(i))}</td>
           <td class="num in">${m.masuk ? money(m.masuk) : '–'}</td>
           <td class="num out">${m.keluar ? money(m.keluar) : '–'}</td>
-          ${showTransfer ? html`<td class="${numClass(m.pindahan)}">${m.pindahan ? `${m.pindahan > 0 ? '+' : ''}${money(m.pindahan)}` : ''}</td>` : ''}
-          <td class="${numClass(selisih(m))}">${selisih(m) > 0 ? '+' : ''}${money(selisih(m))}</td>
+          ${showTransfer ? html`<td class="${numClass(m.pindahan)}">${m.pindahan ? signed(m.pindahan) : ''}</td>` : ''}
+          <td class="${numClass(minus(m.masuk, m.keluar))}">${signed(minus(m.masuk, m.keluar))}</td>
           <td class="${numClass(m.saldo)}"><b>${money(m.saldo)}</b></td>
         </tr>`)}
       </tbody>
       <tfoot><tr><td>Total ${store.year}</td><td class="${numClass(opening)}">${money(opening)}</td>
         <td class="num">${money(total('masuk'))}</td><td class="num">${money(total('keluar'))}</td>
         ${showTransfer ? html`<td class="${numClass(total('pindahan'))}">${money(total('pindahan'))}</td>` : ''}
-        <td class="${numClass(total('masuk') - total('keluar'))}">${money(Math.round((total('masuk') - total('keluar')) * 100) / 100)}</td>
+        <td class="${numClass(minus(total('masuk'), total('keluar')))}">${money(minus(total('masuk'), total('keluar')))}</td>
         <td class="${numClass(shown.at(-1).saldo)}">${money(shown.at(-1).saldo)}</td></tr></tfoot>
     </table></div>
     </div>` : html`<p class="muted empty">Belum ada transaksi di ${store.year}.</p>`, 'monthly');
@@ -238,100 +203,57 @@ function monthlyCard({ months, lastMonth, opening, selected, hint }) {
 
 // ---------------------------------------------------------------- Semua pos
 
-function overviewSection(o, month) {
+function overviewSection(o) {
   const t = o.totals;
-  const p = periodLabel(month);
-  const byBalance = [...o.pos].sort((a, b) => b.closing - a.closing).filter((x) => x.closing !== 0 || x.count);
-  const note = month
-    ? html`Saldo per akhir ${p} ${store.year}${t.belum_dialokasikan ? html` · <span class="status bad">⚠ ${t.belum_dialokasikan} belum punya pos</span>` : ''}`
-    : html`${bankStatus(t)}${t.belum_dialokasikan ? html` · <span class="status bad">⚠ ${t.belum_dialokasikan} belum punya pos</span>` : ''}`;
-  // Keseluruhan: tabel per bulan dulu, lalu grafik saldo & ringkasan per pos.
-  // Per Bulan: pemasukan/pengeluaran tiap pos di bulan itu dulu, lalu perbandingan dengan bulan lain.
-  const monthly = monthlyCard({
-    months: o.months, lastMonth: o.last_month, opening: o.year_opening, selected: month,
-    hint: month ? `${p} disorot · klik bulan lain untuk berpindah` : 'Klik bulan untuk membuka dashboard Per Bulan',
-  });
-  const balanceByPos = card('Saldo per pos', `${p ? `Per akhir ${p} · ` : ''}Klik untuk melihat rincian pos`,
-    rankedBarChart(byBalance.map((x) => ({ label: x.name, value: x.closing, id: x.pos_id }))), 'clickable-bars');
-  const posTable = posSummaryCard(o, month);
+  const byBalance = [...o.pos].sort((a, b) => b.closing - a.closing).filter((p) => p.closing !== 0 || p.count);
   return html`
     <div class="dash-top">
       <div class="col">
         ${balanceHero({
-          title: 'Total Saldo', subtitle: `Semua pos · saldo awal ${p ? `${p} ` : ''}${rupiah(t.opening)}`, amount: t.saldo,
-          inner: { label: p ? `Saldo akhir ${p}, semua pos` : 'Saldo semua pos', note },
+          title: 'Total Saldo', subtitle: `Semua pos · saldo awal ${rupiah(t.opening)}`, amount: t.saldo,
+          inner: { label: 'Saldo semua pos', note: html`${bankStatus(t)}${t.belum_dialokasikan ? html` · <span class="status bad">⚠ ${t.belum_dialokasikan} belum punya pos</span>` : ''}` },
         })}
-        ${donorCard(o.donors, month)}
+        ${donorCard(o.donors)}
       </div>
-      <div class="col">${recentCard(o.recent, { month })}</div>
-      <div class="col">${flowCards(o, t, month)}</div>
+      <div class="col">${recentCard(o.recent, { lastMonth: o.last_month })}</div>
+      <div class="col">
+        ${flowCard('Total Pemasukan', t.masuk, o.months, o.last_month, 'masuk', 'accent', true)}
+        ${flowCard('Total Pengeluaran', t.keluar, o.months, o.last_month, 'keluar', 'ink', false)}
+      </div>
     </div>
 
-    ${month ? html`${posTable}${monthly}${balanceByPos}` : html`
-      ${monthly}
-      <div class="dash-grid">
-        ${card('Saldo total per bulan', 'Saldo akhir bulan, semua pos', balanceLineChart(o.months, { label: 'Saldo total' }))}
-        ${balanceByPos}
-      </div>
-      ${posTable}`}`;
-}
+    ${monthlyCard({ months: o.months, lastMonth: o.last_month, opening: o.year_opening })}
 
-/**
- * Tabel ringkasan per pos. Keseluruhan: setahun dengan tren saldo.
- * Per Bulan: pemasukan, pengeluaran, dan selisih tiap pos di bulan itu (pos aktif di bulan itu di atas).
- */
-function posSummaryCard(o, month) {
-  const t = o.totals;
-  const p = periodLabel(month);
-  const diff = (x) => Math.round((x.masuk - x.keluar) * 100) / 100;
-  const idle = (x) => Number(!x.masuk && !x.keluar); // 1 = tidak ada transaksi di bulan itu
-  const rows = month ? [...o.pos].sort((a, b) => idle(a) - idle(b) || a.number - b.number) : o.pos;
-  return html`
-    ${card(p ? `Pemasukan & Pengeluaran per pos — ${p} ${store.year}` : 'Ringkasan per pos', 'Klik baris untuk melihat rincian pos', html`
-      <div class="table-wrap flat"><table class="table">
-        <thead><tr><th>No</th><th>Pos</th><th class="num">Saldo awal${p ? ` ${p}` : ''}</th><th class="num">Masuk</th><th class="num">Keluar</th>
-          ${month ? html`<th class="num">Selisih</th>` : ''}<th class="num">Pindahan</th><th class="num">Saldo akhir</th>${month ? '' : html`<th>Tren saldo</th>`}</tr></thead>
-        <tbody>${rows.map((x) => html`
-          <tr class="clickable ${month && idle(x) ? 'idle' : ''}" data-pos="${x.pos_id}">
-            <td>${x.number}</td><td><b>${x.name}</b> <span class="muted mono">${x.code}</span></td>
-            <td class="${numClass(x.opening)}">${money(x.opening)}</td>
-            <td class="num in">${x.masuk ? money(x.masuk) : ''}</td>
-            <td class="num out">${x.keluar ? money(x.keluar) : ''}</td>
-            ${month ? html`<td class="${numClass(diff(x))}">${x.masuk || x.keluar ? `${diff(x) > 0 ? '+' : ''}${money(diff(x))}` : ''}</td>` : ''}
-            <td class="${numClass(x.pindahan)}">${x.pindahan ? money(x.pindahan) : ''}</td>
-            <td class="${numClass(x.closing)}"><b>${money(x.closing)}</b></td>
-            ${month ? '' : html`<td>${sparkline(x.monthly)}</td>`}
-          </tr>`)}
-        </tbody>
-        <tfoot><tr><td></td><td>Total</td><td class="num">${money(t.opening)}</td><td class="num">${money(t.masuk)}</td><td class="num">${money(t.keluar)}</td>
-          ${month ? html`<td class="${numClass(diff(t))}">${money(diff(t))}</td>` : ''}<td></td><td class="num">${money(t.saldo)}</td>${month ? '' : html`<td></td>`}</tr></tfoot>
-      </table></div>`, 'pos-summary')}`;
+    <div class="dash-grid">
+      ${card('Saldo total per bulan', 'Saldo akhir bulan, semua pos', balanceLineChart(o.months, { label: 'Saldo total' }))}
+      ${card('Saldo per pos', 'Klik untuk melihat rincian pos', rankedBarChart(byBalance.map((p) => ({ label: p.name, value: p.closing, id: p.pos_id }))), 'clickable-bars')}
+    </div>
+
+    ${posSummaryCard(o)}`;
 }
 
 // ---------------------------------------------------------------- Satu pos
 
-function posSection(d, month) {
-  const p = periodLabel(month);
+function posSection(d) {
   const pindahan = d.pindahan ? ` · pindahan ${d.pindahan > 0 ? '+' : '−'}${rupiah(Math.abs(d.pindahan))}` : '';
   return html`
     <div class="dash-top">
       <div class="col">
         ${balanceHero({
-          title: `Saldo ${d.pos.name}`, subtitle: `Saldo awal ${p ? `${p} ` : ''}${rupiah(d.opening)}${pindahan}`, amount: d.closing,
-          inner: { label: p ? `Saldo akhir ${p}` : 'Saldo akhir', note: throughLabel(d.last_month, month) },
+          title: `Saldo ${d.pos.name}`, subtitle: `Saldo awal ${rupiah(d.opening)}${pindahan}`, amount: d.closing,
+          inner: { label: 'Saldo akhir', note: throughLabel(d.last_month) },
         })}
-        ${d.donors.length ? donorCard(d.donors, month) : ''}
+        ${d.donors.length ? donorCard(d.donors) : ''}
       </div>
-      <div class="col">${recentCard(d.recent, { showPos: false, month })}</div>
-      <div class="col">${flowCards(d, d, month)}</div>
+      <div class="col">${recentCard(d.recent, { showPos: false, lastMonth: d.last_month })}</div>
+      <div class="col">
+        ${flowCard('Total Pemasukan', d.masuk, d.months, d.last_month, 'masuk', 'accent', true)}
+        ${flowCard('Total Pengeluaran', d.keluar, d.months, d.last_month, 'keluar', 'ink', false)}
+      </div>
     </div>
-    ${monthlyCard({
-      months: d.months, lastMonth: d.last_month, opening: d.year_opening, selected: month,
-      hint: month ? `${p} disorot · klik bulan lain untuk berpindah` : 'Klik bulan untuk membuka dashboard Per Bulan',
-    })}
-    ${month ? '' : html`<div class="dash-grid">
+    ${monthlyCard({ months: d.months, lastMonth: d.last_month, opening: d.year_opening })}
+    <div class="dash-grid">
       ${card(`Saldo ${d.pos.name} per bulan`, 'Saldo akhir bulan', balanceLineChart(d.months, { label: `Saldo ${d.pos.name}` }))}
-    </div>`}
-    <p class="toolbar"><a class="btn" href="#/tahunan?sheet=${d.pos.id}${month ? `&bulan=${month}` : ''}">Buka sheet ${d.pos.code} di Laporan per Pos →</a></p>`;
+    </div>
+    <p class="toolbar"><a class="btn" href="#/tahunan?sheet=${d.pos.id}">Buka sheet ${d.pos.code} di Laporan per Pos →</a></p>`;
 }
-

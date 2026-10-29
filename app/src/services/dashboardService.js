@@ -5,7 +5,7 @@
 // dari yayasan). Di tingkat pos, nilainya ditampilkan terpisah sebagai "pindahan" supaya
 // saldo awal + masuk - keluar + pindahan = saldo akhir.
 const { toRupiah } = require('../lib/money');
-const { yearRange, monthOf } = require('../lib/period');
+const { yearRange, monthOf, dayOf } = require('../lib/period');
 const { titleCase } = require('../lib/text');
 const { CATEGORY_DONATUR } = require('./classifier');
 const { sheetName } = require('./presenters');
@@ -94,6 +94,20 @@ module.exports = function dashboardService({ repos, services }) {
   }
 
   /**
+   * Arus kas harian satu bulan (untuk dashboard Per Bulan): pemasukan & pengeluaran tiap tanggal (tanpa pindahan)
+   * dan saldo di akhir hari (termasuk pindahan). Hari tanpa transaksi tetap ada supaya grafik utuh 1..akhir bulan.
+   */
+  function dailyFlows(year, month, openingCents, rows) {
+    const days = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    let saldo = openingCents;
+    return Array.from({ length: days }, (_, i) => {
+      const onDay = rows.filter((t) => dayOf(t.date) === i + 1);
+      saldo += sum(onDay);
+      return { day: i + 1, masuk: toRupiah(sum(onDay.filter(isIn))), keluar: outflow(onDay), saldo: toRupiah(saldo), count: onDay.length };
+    });
+  }
+
+  /**
    * Periode yang dirangkum kartu-kartu dashboard: setahun penuh (month = null) atau satu bulan.
    * before = baris sebelum periode (untuk saldo awal periode), inPeriod = baris di dalam periode.
    */
@@ -162,6 +176,7 @@ module.exports = function dashboardService({ repos, services }) {
         },
         months: monthlyFlows(all, monthlyClosing(totalOpening, all, lastMonth)),
         year_opening: toRupiah(totalOpening),
+        days: month ? dailyFlows(year, month, periodOpening, rows) : null,
         pos,
         recent: recentTransactions(rows, new Map(allPos.map((x) => [x.id, x]))),
         donors: topDonors(rows, new Set(allPos.filter((p) => p.show_donors).map((p) => p.id))),
@@ -193,6 +208,7 @@ module.exports = function dashboardService({ repos, services }) {
         closing: toRupiah(openingCents + sum(rows)),
         count: rows.length,
         months: monthlyFlows(all, monthlyClosing(yearOpening, all, Math.max(lastMonth, 1))),
+        days: month ? dailyFlows(year, month, openingCents, rows) : null,
         recent: recentTransactions(rows, new Map([[p.id, p]])),
         donors: p.show_donors ? topDonors(rows, new Set([p.id])) : [],
       };
