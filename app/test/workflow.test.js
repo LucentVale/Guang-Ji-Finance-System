@@ -122,6 +122,29 @@ test('dashboard per bulan: saldo awal + masuk - keluar + pindahan = saldo akhir 
   assert.equal(d.months.reduce((s, m) => s + m.masuk, 0), d.masuk);
 });
 
+test('dashboard satu bulan: kartu & ringkasan pos hanya bulan itu, saldo awal = saldo akhir bulan sebelumnya', async () => {
+  const t = createTestContext();
+  const { request } = await importJanuary(t);
+  t.ctx.services.imports.commit(t.fothangId, request);
+  t.ctx.services.transaction.create(t.fothangId, { date: '2026-02-03', account_id: t.bcaId, pos_id: t.cuThanId, name: 'Donasi Feb', masuk: 70 });
+  t.ctx.services.transaction.create(t.fothangId, { date: '2026-02-04', account_id: t.bcaId, pos_id: t.cuThanId, name: 'Belanja Feb', keluar: 30 });
+
+  const year = t.ctx.services.dashboard.overview(t.fothangId, 2026);
+  const feb = t.ctx.services.dashboard.overview(t.fothangId, 2026, 2);
+  assert.equal(feb.month, 2);
+  assert.deepEqual([feb.totals.opening, feb.totals.masuk, feb.totals.keluar, feb.totals.saldo], [year.months[0].saldo, 70, 30, year.months[1].saldo]);
+  assert.equal(feb.totals.bank, null, 'pembanding bank hanya untuk saldo akhir tahun berjalan');
+  assert.deepEqual(feb.months, year.months, 'grafik per bulan tetap setahun');
+  assert.equal(feb.year_opening, year.totals.opening);
+  assert.ok(feb.recent.every((r) => r.date.startsWith('2026-02')));
+
+  const cuYear = t.ctx.services.dashboard.pos(t.fothangId, t.cuThanId, 2026);
+  const cuFeb = t.ctx.services.dashboard.pos(t.fothangId, t.cuThanId, 2026, 2);
+  assert.deepEqual([cuFeb.opening, cuFeb.masuk, cuFeb.keluar, cuFeb.closing], [cuYear.months[0].saldo, 70, 30, cuYear.months[1].saldo]);
+  const cuRow = feb.pos.find((p) => p.pos_id === t.cuThanId);
+  assert.deepEqual([cuRow.opening, cuRow.masuk, cuRow.keluar, cuRow.closing], [cuFeb.opening, 70, 30, cuFeb.closing]);
+});
+
 test('pecah transaksi: total tetap, saldo draf tetap cocok, bisa digabung kembali', async () => {
   const t = createTestContext();
   const { request } = await importJanuary(t);

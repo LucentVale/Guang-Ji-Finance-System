@@ -13,6 +13,10 @@ module.exports = function register(router, { services }) {
   router.get(`${base}/laporan-bulanan`, ({ params, query }) =>
     services.report.monthly(params.fothangId, assertYear(query.year), assertMonth(query.month), { all: query.all === '1' }));
 
-  router.get(`${base}/dashboard`, ({ params, query }) => services.dashboard.overview(params.fothangId, assertYear(query.year)));
-  router.get(`${base}/dashboard/pos/:posId`, ({ params, query }) => services.dashboard.pos(params.fothangId, params.posId, assertYear(query.year)));
+  // month opsional: tanpa month = setahun penuh.
+  const optionalMonth = (value) => (value ? assertMonth(value) : null);
+  router.get(`${base}/dashboard`, ({ params, query }) =>
+    services.dashboard.overview(params.fothangId, assertYear(query.year), optionalMonth(query.month)));
+  router.get(`${base}/dashboard/pos/:posId`, ({ params, query }) =>
+    services.dashboard.pos(params.fothangId, params.posId, assertYear(query.year), optionalMonth(query.month)));
 };

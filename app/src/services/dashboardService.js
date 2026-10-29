@@ -93,17 +93,31 @@ module.exports = function dashboardService({ repos, services }) {
     });
   }
 
+  /**
+   * Periode yang dirangkum kartu-kartu dashboard: setahun penuh (month = null) atau satu bulan.
+   * before = baris sebelum periode (untuk saldo awal periode), inPeriod = baris di dalam periode.
+   */
+  function period(rows, month) {
+    if (!month) return { before: [], inPeriod: rows };
+    return { before: rows.filter((t) => monthOf(t.date) < month), inPeriod: rows.filter((t) => monthOf(t.date) === month) };
+  }
+
   return {
-    /** Ringkasan seluruh Fothang dalam satu tahun. */
-    overview(fothangId, year) {
+    /**
+     * Ringkasan seluruh Fothang dalam satu tahun.
+     * month (1-12, opsional): kartu & tabel per pos hanya untuk bulan itu; grafik per bulan tetap setahun.
+     */
+    overview(fothangId, year, month = null) {
       const { from, to } = yearRange(year);
-      const rows = repos.transaction.list({ fothangId, from, to });
+      const all = repos.transaction.list({ fothangId, from, to });
+      const { before, inPeriod: rows } = period(all, month);
       const accounts = repos.account.listByFothang(fothangId);
       const opening = services.balance.snapshot(fothangId, from);
       const tabel = services.ledger.tabel(fothangId, year);
       // Saldo bank hanya diketahui bila ada mutasi rekening koran (data dari file DRAF tidak membawa saldo bank).
-      const hasStatement = tabel.accounts.some((a) => a.kind === 'bank' && a.actual_date);
-      const lastMonth = lastMonthOf(rows);
+      // Pembanding bank berlaku untuk saldo akhir tahun berjalan, jadi tidak ditampilkan saat melihat satu bulan.
+      const hasStatement = !month && tabel.accounts.some((a) => a.kind === 'bank' && a.actual_date);
+      const lastMonth = lastMonthOf(all);
 
       // Saldo awal tahun seluruh Fothang = semua pos (termasuk nonaktif) + yang belum dialokasikan, di semua akun.
       const allPos = services.pos.list(fothangId, { includeInactive: true });
@@ -112,11 +126,13 @@ module.exports = function dashboardService({ repos, services }) {
         totalOpening += opening.unallocated(a.id);
         for (const p of allPos) totalOpening += opening.of(p.id, a.id);
       }
+      const periodOpening = totalOpening + sum(before);
 
       const pos = services.pos.list(fothangId).map((p) => {
         const own = rows.filter((t) => t.pos_id === p.id);
-        const openingCents = accounts.reduce((s, a) => s + opening.of(p.id, a.id), 0);
-        const closing = monthlyClosing(openingCents, own, Math.max(lastMonth, 1));
+        const yearOpening = accounts.reduce((s, a) => s + opening.of(p.id, a.id), 0);
+        const openingCents = yearOpening + sum(before.filter((t) => t.pos_id === p.id));
+        const closing = monthlyClosing(yearOpening, all.filter((t) => t.pos_id === p.id), Math.max(lastMonth, 1));
         return {
           pos_id: p.id, number: p.number, code: p.code, name: p.name,
           opening: toRupiah(openingCents),
@@ -131,10 +147,11 @@ module.exports = function dashboardService({ repos, services }) {
 
       return {
         year,
+        month,
         last_month: lastMonth,
         totals: {
-          opening: toRupiah(totalOpening),
-          saldo: tabel.total,
+          opening: toRupiah(periodOpening),
+          saldo: month ? toRupiah(periodOpening + sum(rows)) : tabel.total,
           bank: hasStatement ? tabel.actual : null,
           bank_date: tabel.accounts.find((a) => a.actual_date)?.actual_date ?? null,
           selisih: hasStatement ? tabel.selisih : null,
@@ -143,34 +160,39 @@ module.exports = function dashboardService({ repos, services }) {
           transaksi: rows.filter((t) => !isTransfer(t)).length,
           belum_dialokasikan: rows.filter((t) => !t.pos_id).length,
         },
-        months: monthlyFlows(rows, monthlyClosing(totalOpening, rows, lastMonth)),
+        months: monthlyFlows(all, monthlyClosing(totalOpening, all, lastMonth)),
+        year_opening: toRupiah(totalOpening),
         pos,
         recent: recentTransactions(rows, new Map(allPos.map((x) => [x.id, x]))),
         donors: topDonors(rows, new Set(allPos.filter((p) => p.show_donors).map((p) => p.id))),
       };
     },
 
-    /** Rincian satu pos dalam satu tahun. */
-    pos(fothangId, posId, year) {
+    /** Rincian satu pos dalam satu tahun, atau satu bulan bila month diisi (grafik per bulan tetap setahun). */
+    pos(fothangId, posId, year, month = null) {
       const p = assertOwned(repos.pos.findById(Number(posId)), fothangId, 'Pos');
       const { from, to } = yearRange(year);
-      const rows = repos.transaction.list({ fothangId, from, to, posId: p.id });
+      const all = repos.transaction.list({ fothangId, from, to, posId: p.id });
+      const { before, inPeriod: rows } = period(all, month);
       const accounts = repos.account.listByFothang(fothangId);
       const opening = services.balance.snapshot(fothangId, from);
-      const openingCents = accounts.reduce((s, a) => s + opening.of(p.id, a.id), 0);
+      const yearOpening = accounts.reduce((s, a) => s + opening.of(p.id, a.id), 0);
+      const openingCents = yearOpening + sum(before);
       const lastMonth = lastMonthOf(repos.transaction.list({ fothangId, from, to }));
 
       return {
         pos: { id: p.id, number: p.number, code: p.code, name: p.name },
         year,
+        month,
         last_month: lastMonth,
+        year_opening: toRupiah(yearOpening),
         opening: toRupiah(openingCents),
         masuk: toRupiah(sum(rows.filter(isIn))),
         keluar: outflow(rows),
         pindahan: toRupiah(sum(rows.filter(isTransfer))),
         closing: toRupiah(openingCents + sum(rows)),
         count: rows.length,
-        months: monthlyFlows(rows, monthlyClosing(openingCents, rows, Math.max(lastMonth, 1))),
+        months: monthlyFlows(all, monthlyClosing(yearOpening, all, Math.max(lastMonth, 1))),
         recent: recentTransactions(rows, new Map([[p.id, p]])),
         donors: p.show_donors ? topDonors(rows, new Set([p.id])) : [],
       };

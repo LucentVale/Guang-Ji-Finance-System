@@ -98,7 +98,22 @@
 .chart .tick.future { opacity: .45; }
 .monthly-body { display: grid; gap: 10px; }
 .monthly-body .chart { max-height: 300px; }
-.dcard.monthly.static .chart .hit { cursor: default; }
+.monthly-table tr.selected td { background: var(--accent-soft); }
+.monthly-table tr.selected td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+
+/* Tab Keseluruhan / Per Bulan & pilihan pos di kepala Dashboard. */
+.view-filters { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; align-items: center; }
+.view-filters .segmented button { padding: 8px 16px; }
+
+/* Deretan tombol bulan (dashboard Per Bulan). */
+.month-strip { display: flex; gap: 6px; flex-wrap: wrap; margin: -4px 0 16px; }
+.month-strip button { border-radius: 999px; padding: 6px 14px; min-width: 52px; background: var(--surface); }
+.month-strip button.on { background: var(--accent-strong); border-color: var(--accent-strong); color: #fff; font-weight: 600; }
+.month-strip button:disabled { opacity: .4; }
+
+/* Per Bulan: pos tanpa transaksi di bulan itu dibuat samar. */
+.pos-summary tr.idle td { color: var(--muted); }
+.pos-summary tr.idle td b { font-weight: 500; }
 /* Layar lebar: grafik & tabel berdampingan supaya grafik tidak setinggi setengah layar. */
 @media (min-width: 1400px) { .monthly-body { grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 24px; align-items: center; } }
 .monthly-table { font-size: 13px; }

@@ -116,9 +116,10 @@ export function miniBarChart(months, field, { lastMonth, tone = 'accent', label 
  * Pemasukan vs pengeluaran per bulan: dua batang berdampingan tiap bulan (Jan–Des).
  * Dua seri, jadi kartu pemakainya wajib menampilkan legenda (lihat flowLegend).
  * Bulan sesudah lastMonth hanya diberi label (belum ada data). Area tiap bulan bisa diklik (data-month).
+ * selected = bulan yang sedang dipilih: batangnya tetap berwarna penuh, bulan lain dibuat lembut.
  * @param {{month:number, masuk:number, keluar:number}[]} months data 12 bulan
  */
-export function monthlyFlowChart(months, { lastMonth }) {
+export function monthlyFlowChart(months, { lastMonth, selected = null }) {
   const H = 260;
   const pad = { l: 64, r: 12, t: 12, b: 28 };
   const shown = months.filter((m) => m.month <= lastMonth);
@@ -135,7 +136,8 @@ export function monthlyFlowChart(months, { lastMonth }) {
     const x = left + (band - (bw * 2 + 2)) / 2;
     marks += `<text x="${left + band / 2}" y="${H - 8}" class="tick${m.month > lastMonth ? ' future' : ''}" text-anchor="middle">${MONTHS[m.month - 1].slice(0, 3)}</text>`;
     if (m.month > lastMonth) return;
-    [[m.masuk, COLORS.accent, 0], [m.keluar, COLORS.ink, bw + 2]].forEach(([v, color, dx]) => {
+    const dim = selected && m.month !== selected;
+    [[m.masuk, dim ? COLORS.accentMuted : COLORS.accent, 0], [m.keluar, dim ? COLORS.inkMuted : COLORS.ink, bw + 2]].forEach(([v, color, dx]) => {
       if (v > 0) marks += `<path d="${columnPath(x + dx, bw, base, Math.min(y(v), base - 2))}" fill="${color}"/>`;
     });
     const selisih = Math.round((m.masuk - m.keluar) * 100) / 100;
