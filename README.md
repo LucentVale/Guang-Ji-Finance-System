@@ -9,5 +9,7 @@ Alur kerjanya mengikuti proses manual di Excel:
 
 - Kode aplikasi, cara menjalankan, dan penjelasan struktur: **[app/README.md](app/README.md)**
 - Pengujian otomatis: `cd app && npm test`
+- Memasang di komputer lain: buat installer dengan `cd app && npm run build:installer` — lihat
+  [app/README.md → Memasang di komputer lain](app/README.md#memasang-di-komputer-lain-installer)
 
 > Data keuangan (mutasi bank, file Excel/PDF, database) **tidak** disimpan di repository ini — lihat `.gitignore`.

@@ -41,6 +41,43 @@ Catatan server tersimpan di `data\server.log`.
 Butuh Node.js versi 22.13 atau lebih baru (memakai SQLite bawaan Node). Data tersimpan di `data/keuangan.db`;
 backup bisa diunduh dari menu **Pengaturan → Backup Database**.
 
+## Memasang di komputer lain (installer)
+
+Komputer lain **tidak perlu** memasang Node.js atau apa pun: semuanya ada di satu file installer.
+
+### Membuat installer (di komputer pengembang)
+
+1. Sekali saja: pasang Inno Setup 6 — `winget install --id JRSoftware.InnoSetup -e --scope user`
+2. Dari folder `app`: `npm run build:installer`
+3. Hasilnya: **`dist\SistemKeuanganGuangJi-Setup-<versi>.exe`** (± 28 MB). Versi diambil dari `package.json`.
+
+Skripnya (`scripts/build-installer.js`) menjalankan `npm run check` dulu, lalu menyalin program, komponen produksi,
+Node.js bawaan, dan **salinan data keuangan saat ini** (`data\keuangan.db`), kemudian mengompilasi `installer/guangji.iss`.
+
+> ⚠️ **Installer berisi data keuangan.** Perlakukan seperti dokumen rahasia: jangan diunggah ke internet atau dibagikan
+> di grup. Folder `dist/` sengaja tidak masuk git.
+
+### Memasang (di komputer tujuan)
+
+1. Salin file installer ke komputer tujuan (Windows 10/11 64-bit), lalu klik dua kali.
+2. Bila muncul **"Windows protected your PC"** (SmartScreen): klik **More info → Run anyway**.
+   Peringatan ini muncul karena installer belum ditandatangani sertifikat resmi (berbayar), bukan karena berbahaya.
+3. Ikuti langkahnya (tidak perlu hak Administrator). Ikon **Sistem Keuangan** muncul di Desktop dan Start Menu.
+
+Yang terpasang:
+
+| Apa | Di mana |
+|---|---|
+| Program + Node.js bawaan | `%LOCALAPPDATA%\Programs\Sistem Keuangan Guang Ji\` |
+| **Data** (database, pengaturan, catatan server) | `%LOCALAPPDATA%\Guang Ji\Sistem Keuangan\` — ada pintasan **Folder Data** di Start Menu |
+
+- Data awal (salinan saat installer dibuat) hanya disalin **bila komputer itu belum punya data**; aplikasi dibuka **tanpa login**.
+- Data tiap komputer **terpisah**: isian di komputer A tidak muncul di komputer B.
+- **Update**: buat installer versi baru (naikkan `version` di `package.json`) lalu pasang di atas versi lama.
+  Server otomatis dihentikan, program diganti, **data tetap**, dan migrasi database berjalan sendiri.
+- **Uninstall** (Start Menu → Uninstall, atau Pengaturan Windows → Apps) menghapus program dan ikon, **bukan data**.
+  Hapus folder data secara manual bila memang ingin membuang datanya.
+
 ## Login & hak akses
 
 **Saat ini login dimatikan** lewat file `app/config.local.json` (`"loginRequired": false`), untuk demo di komputer ini.

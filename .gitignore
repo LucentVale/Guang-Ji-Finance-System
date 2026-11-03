@@ -11,6 +11,9 @@ app/data/
 *.xlsx
 *.pdf
 
+# Hasil "npm run build:installer": installer BERISI DATA KEUANGAN
+dist/
+
 # Pengaturan khusus komputer ini (lihat app/config.local.example.json)
 app/config.local.json
 

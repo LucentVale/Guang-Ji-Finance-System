@@ -35,6 +35,7 @@ npm run lint              # ESLint saja (eslint.config.mjs); 0 error adalah syar
 npm run lint:fix          # perbaiki otomatis temuan yang aman diperbaiki
 npm test                  # node --test, saat ini 48 test — WAJIB lulus semua
 npm start                 # server di http://localhost:3000 (atau pakai ikon "Sistem Keuangan" di Desktop)
+npm run build:installer   # dist\SistemKeuanganGuangJi-Setup-<versi>.exe (butuh Inno Setup 6; BERISI DATA KEUANGAN)
 npm run create-admin      # buat Admin pertama dari terminal
 npm run import-folder     # impor massal mutasi dari folder
 ```
@@ -53,6 +54,16 @@ belum ada pengecekan tipe (TypeScript/checkJs). Sesudah `npm run check`, perubah
 3. jalankan pintasan "Sistem Keuangan" di Desktop (`app/desktop/Buka Sistem Keuangan.vbs` menunggu `/api/auth/status`)
 
 Perubahan yang hanya di `app/public/` cukup memuat ulang halaman.
+
+**Installer untuk komputer lain** (`scripts/build-installer.js` + `installer/guangji.iss`, Inno Setup 6 di
+`%LOCALAPPDATA%\Programs\Inno Setup 6`): per pengguna tanpa Admin; program di `%LOCALAPPDATA%\Programs\Sistem Keuangan Guang Ji`,
+data di `%LOCALAPPDATA%\Guang Ji\Sistem Keuangan` (lewat `GUANGJI_DATA_DIR`, diatur launcher bila ada `..\runtime\node.exe`).
+Data awal & `config.local.json` (`loginRequired: false`) hanya disalin bila belum ada; uninstall tidak menghapus data.
+Lokasi folder data ditulis di DUA tempat yang harus sama: `installer/guangji.iss` (`DataDir`) dan `desktop/Buka Sistem Keuangan.vbs`.
+`AppId` di `.iss` jangan diubah (versi baru harus menimpa versi lama). Untuk update: naikkan `version` di `package.json`.
+Uji pasang: `Setup.exe /VERYSILENT /SUPPRESSMSGBOXES /DIR="%TEMP%\gj-uji\..."` — jangan pakai folder uji yang panjang
+(batas path Windows 260 karakter; file terdalam `node_modules` ± 95 karakter). Ikon & data uji masuk ke Desktop/AppData
+pengguna sungguhan: cadangkan dulu, hapus sesudahnya.
 
 ## Arsitektur
 
@@ -111,6 +122,10 @@ Konsep penting:
 
 - PowerShell 5.1: `Set-Content -Encoding UTF8` menambah BOM dan CRLF — tulis file dengan tool Write/Edit atau Node. Pesan commit panjang: tulis ke file lalu `git commit -F <file>`.
 - Hindari skrip Node satu baris berisi banyak tanda kutip di PowerShell; tulis skripnya ke folder scratchpad lalu jalankan.
+- Tool Write bisa mengubah escape seperti `﻿` / ` ` di kode menjadi karakter aslinya (tak terlihat). ESLint
+  (`no-irregular-whitespace`) menangkapnya; perbaiki dengan skrip Node yang menulis ulang escape-nya.
+- Permintaan POST ke API harus memakai host yang sama dengan header `Origin` (mis. keduanya `localhost`), kalau tidak
+  ditolak 403 oleh pemeriksaan lintas-situs.
 - `npm test` mencetak ringkasan `ℹ tests / pass / fail`; saring dengan `Select-String`.
 - `npm audit` melaporkan 2 kerentanan "moderate" dari `exceljs` → `uuid` (sudah ada sejak awal, bukan dari ESLint).
   JANGAN jalankan `npm audit fix --force`: itu menurunkan exceljs ke 3.4.0 dan merusak ekspor Excel.

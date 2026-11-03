@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "check": "npm run lint && npm test",
+    "build:installer": "node scripts/build-installer.js",
     "import-folder": "node scripts/import-folder.js",
     "create-admin": "node scripts/create-admin.js"
   },
