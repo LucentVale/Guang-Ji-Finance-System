@@ -8,7 +8,7 @@ import { api } from '../core/api.js';
 import { store } from '../core/store.js';
 import { money, numClass, rupiah, dateId, dateShort, MONTHS } from '../core/format.js';
 import { miniBarChart, balanceLineChart, rankedBarChart, attachTooltips, monthlyFlowChart, flowLegend } from '../components/charts.js';
-import { bigMoney, card, donorCard, posSummaryCard, initials, minus, signed } from '../components/dashboardCards.js';
+import { bigMoney, card, donorCard, posSummaryCard, posMonthlyCard, bindPosMonthlyCard, initials, minus, signed } from '../components/dashboardCards.js';
 import { segmented, bindSegmented } from '../components/controls.js';
 import { refreshView } from '../core/router.js';
 import { renderMonthDashboard } from './dashboardMonth.js';
@@ -97,6 +97,8 @@ export async function dashboardView(main, params) {
   on(dash, 'click', '[data-month]', goMonth);
   const strip = $('.month-strip', main);
   if (strip) on(strip, 'click', '[data-month]', goMonth);
+  // Kartu "Per pos per bulan" (hanya di Keseluruhan semua pos): sel = dashboard pos itu pada bulan tersebut.
+  if (!month && !detail) bindPosMonthlyCard(dash, overview, (pos, m) => (location.hash = dashboardHash(pos, m)));
 
   if (month) await renderMonthDashboard(dash, { data: detail || overview, month, posId, overview, onChanged: refreshView });
 }
@@ -226,7 +228,8 @@ function overviewSection(o) {
       ${card('Saldo per pos', 'Klik untuk melihat rincian pos', rankedBarChart(byBalance.map((p) => ({ label: p.name, value: p.closing, id: p.pos_id }))), 'clickable-bars')}
     </div>
 
-    ${posSummaryCard(o)}`;
+    ${posSummaryCard(o)}
+    ${posMonthlyCard(o)}`;
 }
 
 // ---------------------------------------------------------------- Satu pos

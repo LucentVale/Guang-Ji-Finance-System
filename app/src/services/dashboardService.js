@@ -146,7 +146,8 @@ module.exports = function dashboardService({ repos, services }) {
         const own = rows.filter((t) => t.pos_id === p.id);
         const yearOpening = accounts.reduce((s, a) => s + opening.of(p.id, a.id), 0);
         const openingCents = yearOpening + sum(before.filter((t) => t.pos_id === p.id));
-        const closing = monthlyClosing(yearOpening, all.filter((t) => t.pos_id === p.id), Math.max(lastMonth, 1));
+        const ownYear = all.filter((t) => t.pos_id === p.id);
+        const closing = monthlyClosing(yearOpening, ownYear, Math.max(lastMonth, 1));
         return {
           pos_id: p.id, number: p.number, code: p.code, name: p.name,
           opening: toRupiah(openingCents),
@@ -156,6 +157,8 @@ module.exports = function dashboardService({ repos, services }) {
           closing: toRupiah(openingCents + sum(own)),
           count: own.length,
           monthly: closing.map((c) => (c == null ? null : toRupiah(c))),
+          // Pemasukan, pengeluaran, pindahan & saldo akhir tiap bulan (setahun penuh, tidak terpengaruh `month`).
+          months: monthlyFlows(ownYear, closing),
         };
       });
 

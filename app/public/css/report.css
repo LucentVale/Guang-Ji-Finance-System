@@ -3,7 +3,6 @@
 .report-page { padding: 40px 52px; border-bottom: 1px dashed var(--line); }
 .report-page:last-child { border-bottom: 0; }
 .report-head { display: flex; align-items: center; gap: var(--space-4); padding-bottom: 12px; margin-bottom: 18px; border-bottom: 2px solid var(--accent); }
-.report-head img { width: 64px; height: 64px; object-fit: contain; }
 .report-head .org { font-size: var(--fs-sm); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 .report-title { font-weight: 700; font-size: var(--fs-lg); }
 .report-period { font-weight: 600; }
@@ -26,7 +25,6 @@
 /* Layar ponsel: lembar laporan tidak boleh lebih lebar dari layar (kolom angka dipersempit, tepi kertas dikurangi). */
 @media screen and (max-width: 600px) {
   .report-page { padding: var(--space-5) var(--space-3); }
-  .report-head img { width: 44px; height: 44px; }
   .report-table { font-size: var(--fs-sm); }
   .report-table col.c-amount { width: 96px; }
   .report-table col.c-total { width: 104px; }

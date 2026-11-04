@@ -1,9 +1,10 @@
 // Potongan kartu yang dipakai bersama oleh dashboard Keseluruhan (views/dashboardView.js)
 // dan dashboard Per Bulan (views/dashboardMonth.js).
-import { html } from '../core/dom.js';
+import { $, html, render, on } from '../core/dom.js';
 import { store } from '../core/store.js';
 import { money, numClass, MONTHS } from '../core/format.js';
 import { sparkline } from './charts.js';
+import { segmented, bindSegmented } from './controls.js';
 
 /** Angka besar dengan sen dibuat samar, mis. "Rp 327.994.469" + ",24". */
 export function bigMoney(n) {
@@ -61,4 +62,68 @@ export function posSummaryCard(o, month = null) {
         ${month ? html`<td class="${numClass(minus(t.masuk, t.keluar))}">${signed(minus(t.masuk, t.keluar))}</td>` : ''}<td></td>
         <td class="num">${money(t.saldo)}</td>${month ? '' : html`<td></td>`}</tr></tfoot>
     </table></div>`, 'pos-summary');
+}
+
+/** Angka yang bisa dipilih di kartu "Per pos per bulan". */
+const POS_MONTH_FIELDS = [
+  { value: 'masuk', label: 'Pemasukan' },
+  { value: 'keluar', label: 'Pengeluaran' },
+  { value: 'saldo', label: 'Saldo akhir' },
+];
+
+/** Jumlah nominal rupiah tanpa galat pecahan. */
+const total = (values) => Math.round(values.reduce((s, v) => s + (v || 0) * 100, 0)) / 100;
+
+/**
+ * Tabel pos × bulan (Januari s.d. bulan terakhir berisi data) untuk satu angka: masuk, keluar, atau saldo akhir.
+ * Kolom terakhir: total setahun (masuk/keluar) atau saldo akhir terakhir (saldo). Baris data-pos = rincian pos;
+ * sel data-cell-month = dashboard pos itu pada bulan tersebut (lihat bindPosMonthlyCard).
+ * @param {{pos: object[], last_month: number}} o ringkasan dari /api/dashboard (tiap pos punya `months`)
+ */
+function posMonthlyTable(o, field) {
+  const months = Array.from({ length: o.last_month }, (_, i) => i + 1);
+  const isSaldo = field === 'saldo';
+  const value = (p, m) => p.months[m - 1][field];
+  const rowTotal = (p) => (isSaldo ? value(p, o.last_month) : total(months.map((m) => value(p, m))));
+  const show = (v) => (isSaldo || v ? money(v) : '–');
+  const tone = isSaldo ? '' : field === 'masuk' ? 'in' : 'out';
+  return html`
+    <table class="table pos-month-table">
+      <thead><tr><th scope="col">Pos</th>
+        ${months.map((m) => html`<th scope="col" class="num">${MONTHS[m - 1].slice(0, 3)}</th>`)}
+        <th scope="col" class="num">${isSaldo ? `Saldo ${MONTHS[o.last_month - 1].slice(0, 3)}` : `Total ${store.year}`}</th></tr></thead>
+      <tbody>${o.pos.map((p) => html`
+        <tr class="clickable" data-pos="${p.pos_id}" title="Buka dashboard ${p.name}">
+          <th scope="row"><b>${p.name}</b> <span class="muted mono">${p.code}</span></th>
+          ${months.map((m) => html`<td class="${numClass(value(p, m))} ${tone}" data-cell-month="${m}"
+            title="${p.name} · ${MONTHS[m - 1]}">${show(value(p, m))}</td>`)}
+          <td class="${numClass(rowTotal(p))}"><b>${show(rowTotal(p))}</b></td>
+        </tr>`)}
+      </tbody>
+      <tfoot><tr><th scope="row">Total</th>
+        ${months.map((m) => html`<td class="${numClass(total(o.pos.map((p) => value(p, m))))}">${money(total(o.pos.map((p) => value(p, m))))}</td>`)}
+        <td class="${numClass(total(o.pos.map(rowTotal)))}">${money(total(o.pos.map(rowTotal)))}</td></tr></tfoot>
+    </table>`;
+}
+
+/** Kartu "Per pos per bulan" (dashboard Keseluruhan, semua pos). Pasang interaksinya dengan bindPosMonthlyCard. */
+export function posMonthlyCard(o, field = 'masuk') {
+  return card('Per pos per bulan', 'Klik angka untuk membuka dashboard pos itu pada bulan tersebut', o.last_month ? html`
+    <div class="pos-month-bar">${segmented({ name: 'posMonth', label: 'Angka yang ditampilkan', current: field, options: POS_MONTH_FIELDS })}</div>
+    <div class="table-wrap flat pos-month-wrap">${posMonthlyTable(o, field)}</div>` : html`<p class="muted empty">Belum ada transaksi di ${store.year}.</p>`, 'pos-month');
+}
+
+/**
+ * Ganti angka (segmen) dan klik sel bulan. onCell(posId, month) dipanggil untuk sel; klik di luar sel
+ * diteruskan ke halaman (baris data-pos).
+ */
+export function bindPosMonthlyCard(root, o, onCell) {
+  const cardEl = $('.pos-month', root);
+  const wrap = cardEl && $('.pos-month-wrap', cardEl);
+  if (!wrap) return;
+  bindSegmented(cardEl, 'posMonth', (field) => render(wrap, posMonthlyTable(o, field)));
+  on(wrap, 'click', 'td[data-cell-month]', (e, td) => {
+    e.stopPropagation(); // jangan ikut membuka rincian pos setahun (klik baris)
+    onCell(td.closest('tr').dataset.pos, Number(td.dataset.cellMonth));
+  });
 }

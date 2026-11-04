@@ -228,6 +228,16 @@ test('dashboard: total cocok dengan per pos, pindahan tidak dihitung sebagai mas
   assert.deepEqual([cu.opening, cu.masuk, cu.keluar, cu.pindahan, cu.closing], [600, 300, 200, -100, 600]);
   assert.deepEqual(cu.recent.map((r) => [r.date, r.name, r.amount]), [['2026-01-05', 'IURAN MABGI', -200], ['2026-01-02', 'SAHABAT SEJATI', 300]]);
   assert.equal(o.recent.length, 3, 'pindahan (2 baris) tidak ikut di transaksi terbaru');
+
+  // Per pos per bulan: jumlah semua pos = total bulanan, saldo bulan terakhir = saldo akhir pos.
+  assert.deepEqual(kfcc.months[0], { month: 1, masuk: 50, keluar: 0, pindahan: 100, saldo: 550, count: 2 });
+  for (const field of ['masuk', 'keluar', 'pindahan']) {
+    assert.equal(o.pos.reduce((s, p) => s + p.months[0][field], 0), o.months[0][field], field);
+  }
+  for (const p of o.pos) assert.equal(p.months[o.last_month - 1].saldo, p.closing, p.code);
+  // Melihat satu bulan tidak mengubah data per bulan (tetap setahun).
+  const jan = t.ctx.services.dashboard.overview(t.fothangId, 2026, 1);
+  assert.deepEqual(jan.pos.map((p) => p.months), o.pos.map((p) => p.months));
 });
 
 test('tabel: akun kas tanpa hitungan fisik tidak dianggap "cocok", total selisih hanya dari akun berpembanding', async () => {

@@ -4,7 +4,6 @@ import { api } from '../core/api.js';
 
 const card = (title, sub, body) => html`
   <section class="auth-card">
-    <img class="logo" src="img/logo-emblem.png" alt="Logo Yayasan Guang Ji">
     <h1>${title}</h1>
     <p class="sub">${sub}</p>
     ${body}

@@ -55,7 +55,6 @@ function reportPage(b, report, period) {
   return html`
     <article class="report-page">
       <div class="report-head">
-        <img src="img/logo-emblem.png" alt="">
         <div>
           <div class="org">Yayasan Guang Ji · ${report.fothang.name}</div>
           <div class="report-title">Laporan Keuangan ${b.pos.name.toUpperCase()} ${report.fothang.short_name}</div>
