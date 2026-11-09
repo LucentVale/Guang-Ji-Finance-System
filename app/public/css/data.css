@@ -1,0 +1,38 @@
+/* Halaman Data: tab, pilihan bulan, tabel mutasi, dialog konfirmasi hapus. */
+
+.data-tabs { display: flex; gap: var(--space-1); flex-wrap: wrap; margin-bottom: var(--space-4); border-bottom: 1px solid var(--line); }
+.data-tabs a { padding: var(--space-2) var(--space-4); color: var(--muted); text-decoration: none; font-weight: 600;
+  border-bottom: 3px solid transparent; margin-bottom: -1px; }
+.data-tabs a:hover { color: var(--accent-ink); }
+.data-tabs a.on { color: var(--accent-ink); border-bottom-color: var(--accent-strong); }
+
+.data-title { margin: 0; font-size: var(--fs-lg); }
+
+/* 12 bulan dalam kisi; tiap tombol menampilkan jumlah baris bank bulan itu. */
+.month-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(76px, 1fr)); gap: var(--space-2); margin-bottom: var(--space-3); }
+.month-chips button { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px; }
+.month-chips button small { font-size: var(--fs-xs); color: var(--muted); }
+.month-chips button.on, .month-chips button.on:hover:not(:disabled) { background: var(--accent-strong); border-color: var(--accent-strong); color: var(--on-accent); }
+.month-chips button.on small { color: var(--on-accent); }
+
+.data-summary { margin-bottom: var(--space-3); }
+.data-table td { vertical-align: top; }
+.data-desc { display: block; font-size: var(--fs-xs); margin-top: 2px; word-break: break-word; }
+
+/* Ringkasan baris yang akan dihapus (dialog). */
+.data-facts { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-1) var(--space-3); margin: 0 0 var(--space-3); }
+.data-facts dt { color: var(--muted); }
+.data-facts dd { margin: 0; word-break: break-word; }
+
+/* Tab Semua transaksi: saringan, bilah pilihan banyak baris. */
+.data-tx .data-filters { padding: 0 0 var(--space-3); }
+.data-filters input[type="date"] { padding: 5px 8px; }
+.data-bulk { padding: var(--space-2) var(--space-3); margin-bottom: var(--space-3); border-radius: var(--radius);
+  background: var(--accent-soft); border: 1px solid var(--accent-line); }
+.data-bulk[hidden] { display: none; }
+.data-table tbody tr.row-warn td { background: var(--warn-soft); }
+
+/* Tab Donatur */
+.data-note { margin: 0 0 var(--space-3); font-size: var(--fs-sm); }
+.data-merge { display: flex; flex-direction: column; gap: var(--space-2); border: 0; padding: 0; margin: 0 0 var(--space-3); }
+.data-merge input:not([type]) { margin-left: 26px; }

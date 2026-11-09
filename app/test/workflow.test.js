@@ -187,6 +187,91 @@ test('pecah transaksi: total tetap, saldo draf tetap cocok, bisa digabung kembal
   assert.equal(t.ctx.services.transaction.get(t.fothangId, donasi.id).amount_cents, 30000);
 });
 
+test('data: hapus mutasi sebulan beserta pecahannya, draf/manual & bulan lain tetap', async () => {
+  const t = createTestContext();
+  const { request } = await importJanuary(t);
+  t.ctx.services.imports.commit(t.fothangId, request);
+  const tx = t.ctx.services.transaction;
+  const donasi = tx.list(t.fothangId, { year: 2026 }).find((r) => r.masuk === 300);
+  tx.split(t.fothangId, donasi.id, { amount: 100, pos_id: t.kfccId });
+  const manual = { account_id: t.bcaId, pos_id: t.cuThanId, name: 'Kas manual', masuk: 25 };
+  tx.create(t.fothangId, { ...manual, date: '2026-01-10' });
+  tx.create(t.fothangId, { ...manual, date: '2026-02-03' });
+  tx.transfer(t.fothangId, { account_id: t.bcaId, date: '2026-01-15', from_pos_id: t.cuThanId, to_pos_id: t.kfccId, amount: 10 });
+
+  // Fothang lain tidak bisa menghapus mutasi akun ini.
+  const other = t.ctx.services.fothang.create({ code: 'LAIN', name: 'Lain Fo Thang', start_date: '2026-01-01' });
+  assert.throws(() => tx.removeMutasiMonth(other.id, { account_id: t.bcaId, year: 2026, month: 1 }), /Akun tidak ditemukan/);
+  assert.throws(() => tx.removeMutasiMonth(t.fothangId, { account_id: t.bcaId, year: 2026, month: 13 }), /Bulan tidak valid/);
+
+  assert.deepEqual(tx.removeMutasiMonth(t.fothangId, { account_id: t.bcaId, year: 2026, month: 2 }), { deleted: 0 });
+  assert.deepEqual(tx.removeMutasiMonth(t.fothangId, { account_id: t.bcaId, year: 2026, month: 1 }), { deleted: 3 });
+  const left = tx.list(t.fothangId, { year: 2026 });
+  assert.equal(left.filter((r) => r.source === 'mutasi').length, 0, 'pecahan ikut terhapus');
+  assert.deepEqual(left.map((r) => r.source).sort(), ['manual', 'manual', 'pindahan', 'pindahan']);
+
+  // Bisa diimpor ulang setelah dihapus.
+  assert.deepEqual(t.ctx.services.imports.commit(t.fothangId, request), { added: 3, skipped: 0, excluded: 0 });
+});
+
+test('daftar transaksi: saring kategori & rentang tanggal (dalam tahun terpilih)', async () => {
+  const t = createTestContext();
+  const { request } = await importJanuary(t);
+  t.ctx.services.imports.commit(t.fothangId, request);
+  const list = (q) => t.ctx.services.transaction.list(t.fothangId, { year: 2026, ...q }).map((r) => r.date);
+  assert.deepEqual(list({}), ['2026-01-02', '2026-01-05', '2026-01-06']);
+  assert.deepEqual(list({ date_from: '2026-01-05' }), ['2026-01-05', '2026-01-06']);
+  assert.deepEqual(list({ date_to: '2026-01-05' }), ['2026-01-02', '2026-01-05']);
+  assert.deepEqual(list({ date_from: '2025-06-01', date_to: '2027-03-01' }), list({}), 'tidak keluar dari tahun terpilih');
+  const cat = t.ctx.services.transaction.list(t.fothangId, { year: 2026 })[0].category;
+  assert.ok(cat);
+  assert.deepEqual(list({ category: cat.toLowerCase() }), ['2026-01-02']);
+  assert.throws(() => list({ date_from: '5-1-2026' }), /Tanggal awal tidak valid/);
+});
+
+test('data: gabungkan ejaan nama donatur (hanya transaksi masuk, Fothang sendiri)', async () => {
+  const t = createTestContext();
+  const tx = t.ctx.services.transaction;
+  const base = { account_id: t.bcaId, pos_id: t.cuThanId, date: '2026-01-10' };
+  tx.create(t.fothangId, { ...base, name: 'Huang Fa Yen', masuk: 100 });
+  tx.create(t.fothangId, { ...base, name: 'HUANG  FA YEN', masuk: 200 });
+  tx.create(t.fothangId, { ...base, name: 'Huang Fa Yen', keluar: 50 });
+  tx.create(t.fothangId, { ...base, name: 'Lain', masuk: 10 });
+  const other = t.ctx.services.fothang.create({ code: 'LAIN', name: 'Lain Fo Thang', start_date: '2026-01-01', accounts: [{ name: 'BCA', kind: 'bank', opening: 0 }] });
+  const otherAcc = t.ctx.repos.account.listByFothang(other.id)[0];
+  tx.create(other.id, { account_id: otherAcc.id, date: '2026-01-10', name: 'Huang Fa Yen', masuk: 5 });
+
+  assert.throws(() => tx.renameDonor(t.fothangId, { from: ['Huang Fa Yen'], to: '  ' }), /Nama baru wajib/);
+  assert.throws(() => tx.renameDonor(t.fothangId, { from: [], to: 'X' }), /Pilih nama/);
+  // Nama tersimpan sudah dirapikan (spasi ganda hilang), jadi yang dikirim adalah nama persis seperti di daftar.
+  const names = tx.list(t.fothangId, { year: 2026 }).map((r) => r.name);
+  assert.deepEqual(names, ['Huang Fa Yen', 'HUANG FA YEN', 'Huang Fa Yen', 'Lain']);
+  assert.deepEqual(tx.renameDonor(t.fothangId, { from: ['Huang Fa Yen', 'HUANG FA YEN'], to: ' HUANG FA YEN ' }), { updated: 1 });
+  assert.deepEqual(tx.list(t.fothangId, { year: 2026 }).map((r) => r.name), ['HUANG FA YEN', 'HUANG FA YEN', 'Huang Fa Yen', 'Lain'], 'pengeluaran tidak berubah');
+  assert.equal(tx.list(other.id, { year: 2026 })[0].name, 'Huang Fa Yen', 'Fothang lain tidak berubah');
+});
+
+test('data: ganti / gabungkan kategori, kategori sistem terlindungi', async () => {
+  const t = createTestContext();
+  const tx = t.ctx.services.transaction;
+  const base = { account_id: t.bcaId, pos_id: t.cuThanId, date: '2026-01-10', name: 'A' };
+  tx.create(t.fothangId, { ...base, category: 'pelita', masuk: 100 });
+  tx.create(t.fothangId, { ...base, category: 'PELITA ULAMBANA', masuk: 200 });
+  tx.create(t.fothangId, { ...base, date: '2025-12-01', category: 'PELITA ULAMBANA', masuk: 5 });
+  tx.create(t.fothangId, { ...base, category: 'DONASI', masuk: 10 });
+  tx.transfer(t.fothangId, { account_id: t.bcaId, date: '2026-01-15', from_pos_id: t.cuThanId, to_pos_id: t.kfccId, amount: 1 });
+
+  assert.throws(() => tx.renameCategory(t.fothangId, { from: ['PELITA'], to: ' ' }), /wajib diisi/);
+  assert.throws(() => tx.renameCategory(t.fothangId, { from: ['DONATUR'], to: 'X' }), /DONATUR dipakai sistem/);
+  assert.throws(() => tx.renameCategory(t.fothangId, { from: ['PINDAHAN KE KHAI FANG CI CING'], to: 'X' }), /dipakai sistem/);
+  assert.throws(() => tx.renameCategory(t.fothangId, { from: ['PELITA'], to: 'pindahan x' }), /PINDAHAN/);
+
+  assert.deepEqual(tx.renameCategory(t.fothangId, { from: ['PELITA', 'PELITA ULAMBANA'], to: ' pelita ' }), { updated: 2 }, 'semua tahun');
+  assert.deepEqual(tx.renameCategory(t.fothangId, { from: ['DONASI'], to: 'donatur' }), { updated: 1 });
+  const cats = t.ctx.repos.transaction.categories(t.fothangId);
+  assert.deepEqual([...cats].sort(), ['DONATUR', 'PELITA', 'PINDAHAN DARI CU THAN', 'PINDAHAN KE KHAI FANG CI CING'].sort());
+});
+
 test('laporan bulanan mengelompokkan pemasukan & daftar donatur', async () => {
   const t = createTestContext();
   const { request } = await importJanuary(t);

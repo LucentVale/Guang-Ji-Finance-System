@@ -12,6 +12,7 @@ import { drafView } from './views/drafView.js';
 import { workbookView } from './views/workbookView.js';
 import { cekView } from './views/cekView.js';
 import { laporanView } from './views/laporanView.js';
+import { dataView } from './views/dataView.js';
 import { riwayatView } from './views/riwayatView.js';
 import { penggunaView } from './views/penggunaView.js';
 import { pengaturanView } from './views/pengaturanView.js';
@@ -25,6 +26,7 @@ const VIEWS = {
   tahunan: { render: workbookView, permission: 'read' },
   cek: { render: cekView, permission: 'read' },
   laporan: { render: laporanView, permission: 'read' },
+  data: { render: dataView, permission: 'read' },
   riwayat: { render: riwayatView, permission: 'read' },
   pengguna: { render: penggunaView, permission: 'admin' },
   pengaturan: { render: pengaturanView, permission: 'admin' },

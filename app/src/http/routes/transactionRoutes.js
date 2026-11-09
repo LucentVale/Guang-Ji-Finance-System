@@ -9,6 +9,15 @@ module.exports = function register(router, { services }) {
   router.put(`${base}/:id`, ({ params, body }) => { services.transaction.update(params.fothangId, params.id, body); }, { audit: 'Mengubah transaksi' });
   router.delete(`${base}/:id`, ({ params }) => { services.transaction.remove(params.fothangId, params.id); }, { audit: 'Menghapus transaksi' });
 
+  router.post('/api/fothang/:fothangId/mutasi/delete-month', ({ params, body }) => services.transaction.removeMutasiMonth(params.fothangId, body),
+    { audit: 'Menghapus mutasi satu bulan' });
+
+  router.post('/api/fothang/:fothangId/donors/rename', ({ params, body }) => services.transaction.renameDonor(params.fothangId, body),
+    { audit: 'Menggabungkan nama donatur' });
+
+  router.post('/api/fothang/:fothangId/categories/rename', ({ params, body }) => services.transaction.renameCategory(params.fothangId, body),
+    { audit: 'Mengganti / menggabungkan kategori' });
+
   router.post(`${base}/:id/split`, ({ params, body }) => reply.created({ id: services.transaction.split(params.fothangId, params.id, body) }),
     { audit: 'Memecah transaksi' });
   router.post(`${base}/assign-pos`, ({ params, body }) => ({ updated: services.transaction.assignPos(params.fothangId, body.ids || [], body.pos_id) }),

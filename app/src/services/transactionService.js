@@ -7,6 +7,14 @@ const { assertIsoDate, monthRange, yearRange, assertYear, assertMonth } = requir
 const { clean, upper, titleCase } = require('../lib/text');
 const { assertOwned } = require('./guards');
 const present = require('./presenters');
+const { CATEGORY_DONATUR } = require('./classifier');
+
+// Kategori yang dipakai sistem (laporan donatur, baris otomatis bank) — tidak boleh diganti namanya.
+const FIXED_CATEGORIES = [CATEGORY_DONATUR, 'BUNGA BANK', 'PAJAK BUNGA', 'BIAYA ADM'];
+const isFixedCategory = (c) => FIXED_CATEGORIES.includes(c) || c.startsWith('PINDAHAN');
+
+/** Tanggal ISO sehari sesudahnya. */
+const nextDay = (iso) => new Date(Date.parse(`${iso}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
 
 module.exports = function transactionService({ db, repos, services }) {
   function lookups(fothangId) {
@@ -43,13 +51,25 @@ module.exports = function transactionService({ db, repos, services }) {
     };
   }
 
-  /** Filter dari query string: year, month, pos_id, account_id, type, q. */
+  /**
+   * Filter dari query string: year, month, pos_id, account_id, type, source, category, q,
+   * date_from & date_to (inklusif, dipersempit ke dalam tahun/bulan yang dipilih).
+   */
   function filterFromQuery(fothangId, q) {
     const year = assertYear(q.year);
     const range = q.month ? monthRange(year, assertMonth(q.month)) : yearRange(year);
+    if (q.date_from) {
+      const from = assertIsoDate(q.date_from, 'Tanggal awal');
+      if (from > range.from) range.from = from;
+    }
+    if (q.date_to) {
+      const to = nextDay(assertIsoDate(q.date_to, 'Tanggal akhir'));
+      if (to < range.to) range.to = to;
+    }
     return {
       fothangId,
       ...range,
+      category: q.category == null || q.category === '' ? null : upper(q.category),
       posId: q.pos_id === 'none' ? 'none' : Number(q.pos_id) || null,
       accountId: Number(q.account_id) || null,
       type: q.type,
@@ -102,6 +122,50 @@ module.exports = function transactionService({ db, repos, services }) {
     },
 
     /**
+     * Hapus semua baris hasil impor mutasi satu akun bank dalam satu bulan (beserta pecahannya),
+     * mis. untuk mengimpor ulang file yang salah. Baris draf, manual, dan pindahan tidak disentuh.
+     * input: { account_id, year, month } — mengembalikan { deleted } (jumlah baris bank).
+     */
+    removeMutasiMonth(fothangId, input) {
+      const account = assertOwned(repos.account.findById(Number(input.account_id)), fothangId, 'Akun');
+      const { from, to } = monthRange(assertYear(input.year), assertMonth(input.month));
+      return { deleted: inTransaction(db, () => repos.transaction.deleteMutasiForAccountPeriod(account.id, from, to)) };
+    },
+
+    /**
+     * Gabungkan beberapa ejaan nama donatur menjadi satu, mis. "Huang Fa Yen" & "HUANG FA YEN " -> "HUANG FA YEN".
+     * Berlaku untuk semua tahun di Fothang ini, hanya transaksi masuk (pengeluaran & pindahan tidak disentuh).
+     * input: { from: [nama lama persis seperti tersimpan], to: nama baru } — mengembalikan { updated }.
+     */
+    renameDonor(fothangId, input) {
+      const to = clean(input.to);
+      if (!to) throw badRequest('Nama baru wajib diisi');
+      if (!Array.isArray(input.from) || !input.from.length) throw badRequest('Pilih nama yang akan digabungkan');
+      const from = [...new Set(input.from.map((n) => String(n ?? '')))].filter((n) => n && n !== to);
+      if (from.length > 100) throw badRequest('Terlalu banyak nama sekaligus (maksimal 100)');
+      return { updated: inTransaction(db, () => repos.transaction.renameIncoming(fothangId, from, to)) };
+    },
+
+    /**
+     * Ganti nama / gabungkan kategori, mis. "PELITA " & "PELITA ULAMBANA" -> "PELITA".
+     * Berlaku untuk semua tahun di Fothang ini; pindahan antar pos tidak disentuh.
+     * Kategori sistem (DONATUR, BUNGA BANK, PAJAK BUNGA, BIAYA ADM, PINDAHAN ...) tidak bisa diganti,
+     * tetapi kategori lain boleh digabungkan KE kategori tersebut (mis. "DONASI" -> "DONATUR").
+     * input: { from: [kategori lama], to: kategori baru } — mengembalikan { updated }.
+     */
+    renameCategory(fothangId, input) {
+      const to = upper(input.to);
+      if (!to) throw badRequest('Nama kategori baru wajib diisi');
+      if (to.startsWith('PINDAHAN')) throw badRequest('Kategori PINDAHAN dipakai untuk pindahan antar pos');
+      if (!Array.isArray(input.from) || !input.from.length) throw badRequest('Pilih kategori yang akan diganti');
+      const from = [...new Set(input.from.map((c) => String(c ?? '')))].filter((c) => c && c !== to);
+      const fixed = from.find(isFixedCategory);
+      if (fixed) throw badRequest(`Kategori ${fixed} dipakai sistem dan tidak bisa diganti`);
+      if (from.length > 100) throw badRequest('Terlalu banyak kategori sekaligus (maksimal 100)');
+      return { updated: inTransaction(db, () => repos.transaction.renameCategory(fothangId, from, to)) };
+    },
+
+    /**
      * Pecah satu transaksi menjadi dua baris dengan pos berbeda, total tetap sama.
      * Contoh: transfer Sherly Rp 1.000.000 -> 500.000 tetap di CU THAN, 500.000 dipecah ke KFCC.
      * Baris pecahan menyalin data bank (tanggal, kode mutasi) dan menunjuk ke baris asal lewat split_of.
@@ -147,8 +211,7 @@ module.exports = function transactionService({ db, repos, services }) {
       const account = assertOwned(repos.account.findById(Number(query.account_id)), fothangId, 'Akun');
       const date = assertIsoDate(query.date);
       // Saldo awal pos + transaksi s/d tanggal itu (snapshot menghitung SEBELUM tanggal, jadi pakai hari berikutnya).
-      const nextDay = new Date(Date.parse(`${date}T00:00:00Z`) + 86400000).toISOString().slice(0, 10);
-      const saldo = services.balance.snapshot(fothangId, nextDay).of(pos.id, account.id);
+      const saldo = services.balance.snapshot(fothangId, nextDay(date)).of(pos.id, account.id);
       return { pos_id: pos.id, account_id: account.id, date, saldo: saldo / 100 };
     },
 

@@ -5,7 +5,7 @@ const ORDER = 'ORDER BY date, seq, id';
 module.exports = function transactionRepo(db) {
   /**
    * Bangun klausa WHERE dari filter.
-   * filter: { fothangId, from, to, posId ('none' = belum dialokasikan), accountId, type ('in'|'out'), search }
+   * filter: { fothangId, from, to, posId ('none' = belum dialokasikan), accountId, type ('in'|'out'), source, category, search }
    */
   function where(filter) {
     const clauses = ['fothang_id = ?'];
@@ -16,6 +16,7 @@ module.exports = function transactionRepo(db) {
     else if (filter.posId) { clauses.push('pos_id = ?'); args.push(filter.posId); }
     if (filter.accountId) { clauses.push('account_id = ?'); args.push(filter.accountId); }
     if (filter.source) { clauses.push('source = ?'); args.push(filter.source); }
+    if (filter.category != null) { clauses.push('category = ?'); args.push(filter.category); }
     if (filter.type === 'in') clauses.push('amount_cents > 0');
     if (filter.type === 'out') clauses.push('amount_cents < 0');
     if (filter.search) {
@@ -101,6 +102,32 @@ module.exports = function transactionRepo(db) {
     deleteForAccountPeriod: (accountId, from, to) =>
       Number(db.prepare("DELETE FROM transactions WHERE account_id = ? AND date >= ? AND date < ? AND source <> 'pindahan' AND split_of IS NULL")
         .run(accountId, from, to).changes),
+
+    /**
+     * Hapus baris hasil impor mutasi satu akun dalam rentang tanggal (dipakai halaman Data).
+     * Hanya baris asal yang dihapus; pecahannya ikut terhapus lewat ON DELETE CASCADE.
+     * Mengembalikan jumlah baris bank (baris asal) yang terhapus.
+     */
+    deleteMutasiForAccountPeriod: (accountId, from, to) =>
+      Number(db.prepare("DELETE FROM transactions WHERE account_id = ? AND date >= ? AND date < ? AND source = 'mutasi' AND split_of IS NULL")
+        .run(accountId, from, to).changes),
+
+    /**
+     * Ganti nama donatur: semua transaksi MASUK (bukan pindahan) satu Fothang yang namanya persis salah satu dari `names`.
+     * Mengembalikan jumlah baris yang berubah.
+     */
+    renameIncoming(fothangId, names, to) {
+      const st = db.prepare(`UPDATE transactions SET name = ?, updated_at = datetime('now','localtime')
+        WHERE fothang_id = ? AND name = ? AND amount_cents > 0 AND source <> 'pindahan'`);
+      return names.reduce((n, name) => n + Number(st.run(to, fothangId, name).changes), 0);
+    },
+
+    /** Ganti kategori semua transaksi (bukan pindahan) satu Fothang yang kategorinya salah satu dari `categories`. */
+    renameCategory(fothangId, categories, to) {
+      const st = db.prepare(`UPDATE transactions SET category = ?, updated_at = datetime('now','localtime')
+        WHERE fothang_id = ? AND category = ? AND source <> 'pindahan'`);
+      return categories.reduce((n, c) => n + Number(st.run(to, fothangId, c).changes), 0);
+    },
 
     /** Jumlah baris per sumber untuk satu akun dalam rentang tanggal: { mutasi: 120, draf: 0, ... } */
     countBySource(accountId, from, to) {
