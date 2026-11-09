@@ -115,3 +115,9 @@ main.view-fill .sheet-scroll { flex: 1; min-height: 220px; max-height: none; }
 .filter-bar .warn-slot { margin-left: auto; }
 .minus-warn { display: inline-block; padding: 4px 12px; border-radius: var(--radius-pill); font-size: var(--fs-sm); background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn-line); }
 .month-toggle:disabled { cursor: default; opacity: 1; }
+
+/* Impor mutasi: baris yang dipilih "Lewati" (tidak disimpan) — dicoret & disamarkan, tombol Batalkan tetap jelas. */
+.sheet tr.is-skipped td { text-decoration: line-through; color: var(--muted); }
+.sheet tr.is-skipped td:last-child { text-decoration: none; }
+.sheet .skip-btn { white-space: nowrap; color: var(--out-ink); }
+.sheet tr.is-skipped .skip-btn { color: var(--accent-ink); }

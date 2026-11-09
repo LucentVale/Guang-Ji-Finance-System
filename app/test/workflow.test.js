@@ -25,8 +25,22 @@ test('impor membaca baris, keterangan bank, dan mencegah impor ganda', async () 
   assert.equal(preview[0].bank_desc, '0201/FTSCY/WS95271 300.00 | SANTY');
   assert.ok(preview.every((r) => r.chain_ok));
 
-  assert.deepEqual(t.ctx.services.imports.commit(t.fothangId, request), { added: 3, skipped: 0 });
-  assert.deepEqual(t.ctx.services.imports.commit(t.fothangId, request), { added: 0, skipped: 3 });
+  assert.deepEqual(t.ctx.services.imports.commit(t.fothangId, request), { added: 3, skipped: 0, excluded: 0 });
+  assert.deepEqual(t.ctx.services.imports.commit(t.fothangId, request), { added: 0, skipped: 3, excluded: 0 });
+});
+
+test('impor: baris yang dipilih "Lewati" tidak disimpan dan muncul lagi saat impor ulang', async () => {
+  const t = createTestContext();
+  const { request } = await importJanuary(t);
+  assert.throws(() => t.ctx.services.imports.commit(t.fothangId, { ...request, exclude: [9] }), /Baris 9/);
+  assert.throws(() => t.ctx.services.imports.commit(t.fothangId, { ...request, exclude: '3' }), /tidak valid/);
+
+  assert.deepEqual(t.ctx.services.imports.commit(t.fothangId, { ...request, exclude: [3] }), { added: 2, skipped: 0, excluded: 1 });
+  const saved = t.ctx.services.transaction.list(t.fothangId, { year: 2026 });
+  assert.deepEqual(saved.map((r) => r.bank_code), ['CU THAN ; SAHABAT SEJATI', 'CU THAN ; IURAN MABGI']);
+  // Tidak diingat: impor ulang menampilkan baris itu lagi sebagai baris baru.
+  assert.deepEqual(t.ctx.services.imports.preview(t.fothangId, request).map((r) => r.duplicate), [true, true, false]);
+  assert.deepEqual(t.ctx.services.imports.commit(t.fothangId, request), { added: 1, skipped: 2, excluded: 0 });
 });
 
 test('koreksi alokasi saat impor dipakai, nominal tetap dari file', async () => {
@@ -199,7 +213,7 @@ test('impor memecah otomatis kode "... 500K KFCC"', async () => {
   const file = await makeMutasiFile([['16/01', 'TRSF E-BANKING CR', 'CU THAN ; SHERLY THE (500K) KFCC ; SHERLY THE (500K)', '1,000,000.00 CR', '1,001,000.00']]);
   const upload = await t.ctx.services.imports.upload(t.fothangId, file, 'Mutasi Januari 2026.xlsx');
   const request = { token: upload.token, sheet: 'Jan 26', year: 2026, account_id: t.bcaId };
-  assert.deepEqual(t.ctx.services.imports.commit(t.fothangId, request), { added: 1, skipped: 0 });
+  assert.deepEqual(t.ctx.services.imports.commit(t.fothangId, request), { added: 1, skipped: 0, excluded: 0 });
 
   const rows = t.ctx.services.transaction.list(t.fothangId, { year: 2026 });
   assert.deepEqual(rows.map((r) => [r.pos, r.category, r.masuk]), [['CU THAN', 'DONATUR', 500000], ['KFCC', 'DONATUR', 500000]]);

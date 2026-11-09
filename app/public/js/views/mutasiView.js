@@ -120,6 +120,8 @@ async function showPreview(panel, request) {
   const unknown = fresh.filter((r) => !r.pos_id);
   const brokenChain = rows.filter((r) => !r.chain_ok);
   const overrides = {}; // seq -> { pos_id?, category?, name? }
+  const excluded = new Set(); // seq baris yang dipilih "Lewati" (tidak disimpan)
+  const bySeq = new Map(rows.map((r) => [r.seq, r]));
 
   render(box, html`
     <div class="toolbar mb-3">
@@ -128,14 +130,16 @@ async function showPreview(panel, request) {
       ${rows.length > fresh.length ? html`<span class="badge">${rows.length - fresh.length} sudah pernah diimpor</span>` : ''}
       ${unknown.length ? html`<span class="badge badge-warn">${unknown.length} kode pos tidak dikenal</span>` : ''}
       ${brokenChain.length ? html`<span class="badge badge-red">${brokenChain.length} saldo tidak berurutan</span>` : ''}
+      <span class="badge" id="skipBadge" hidden></span>
       <span class="spacer"></span>
       <button class="btn-primary" id="commitBtn" ${fresh.length ? '' : 'disabled'}>Simpan ${fresh.length} transaksi</button>
     </div>
-    ${unknown.length ? html`<p class="notice">Baris kuning: kode pos di kolom C tidak dikenal. Pilih pos-nya di sini, atau biarkan kosong dan alokasikan nanti di Draf.</p>` : ''}
+    ${unknown.length ? html`<p class="notice">Baris kuning: kode pos di kolom C tidak dikenal. Pilih pos-nya di sini, biarkan kosong dan alokasikan nanti di Draf, atau klik ✕ Lewati bila tidak ingin dicatat.</p>` : ''}
     ${brokenChain.length ? html`<p class="notice">Baris merah: saldo sebelumnya + nominal ≠ saldo bank. Periksa apakah ada baris yang terlewat di file.</p>` : ''}
+    <p class="notice" id="skipNotice" role="status" hidden></p>
     <div class="sheet-scroll" style="max-height:55vh">
       <table class="sheet">
-        <thead><tr><th>Tgl</th><th>Kode (kolom C)</th><th>Pos</th><th>Kategori</th><th>Nama</th><th>Masuk</th><th>Keluar</th><th>Saldo Bank</th></tr></thead>
+        <thead><tr><th>Tgl</th><th>Kode (kolom C)</th><th>Pos</th><th>Kategori</th><th>Nama</th><th>Masuk</th><th>Keluar</th><th>Saldo Bank</th><th><span class="sr-only">Lewati</span></th></tr></thead>
         <tbody>${rows.map((r) => html`
           <tr data-seq="${r.seq}" class="${!r.chain_ok ? 'row-warn' : !r.pos_id && !r.duplicate ? 'row-warn' : ''} ${r.duplicate ? 'is-dim' : ''}">
             <td>${dateId(r.date)}</td>
@@ -147,6 +151,8 @@ async function showPreview(panel, request) {
             <td class="num in">${r.amount_cents > 0 ? money(r.amount_cents / 100) : ''}</td>
             <td class="num out">${r.amount_cents < 0 ? money(-r.amount_cents / 100) : ''}</td>
             <td class="num ${r.chain_ok ? 'muted' : 'neg'}">${r.balance_cents == null ? '' : money(r.balance_cents / 100)}</td>
+            <td>${r.duplicate ? '' : html`<button type="button" class="btn-ghost btn-small skip-btn" data-skip aria-pressed="false"
+              aria-label="Lewati baris ${dateId(r.date)} ${r.bank_code}">✕ Lewati</button>`}</td>
           </tr>`)}</tbody>
       </table>
     </div>`);
@@ -156,20 +162,54 @@ async function showPreview(panel, request) {
     overrides[seq] = { ...overrides[seq], [input.dataset.field]: input.value };
   });
 
+  /** Perbarui tombol Simpan, lencana & pemberitahuan sesuai baris yang dilewati. */
+  const showSkipped = () => {
+    const saving = fresh.length - excluded.size;
+    const commitBtn = $('#commitBtn', box);
+    commitBtn.textContent = `Simpan ${saving} transaksi`;
+    commitBtn.disabled = !saving;
+    const badge = $('#skipBadge', box);
+    badge.hidden = !excluded.size;
+    badge.textContent = `${excluded.size} dilewati`;
+    // Efek ke saldo: baris keluar yang dilewati membuat saldo sistem lebih besar dari bank, dan sebaliknya.
+    const netCents = [...excluded].reduce((s, seq) => s + bySeq.get(seq).amount_cents, 0);
+    const notice = $('#skipNotice', box);
+    notice.hidden = !excluded.size;
+    const effect = netCents
+      ? ` Akibatnya di Cek Saldo, saldo sistem ${netCents < 0 ? 'lebih besar' : 'lebih kecil'} Rp ${money(Math.abs(netCents) / 100)} dari saldo bank sampai ada transaksi pelengkapnya.`
+      : '';
+    notice.textContent = `${excluded.size} baris tidak akan dicatat.${effect} Bila file yang sama diimpor ulang, baris ini muncul lagi sebagai baris baru.`;
+  };
+
+  // ✕ Lewati / ↺ Batalkan: baris tidak disimpan; bisa dikembalikan sebelum Simpan.
+  on($('table', box), 'click', '[data-skip]', (e, btn) => {
+    const tr = btn.closest('tr');
+    const seq = Number(tr.dataset.seq);
+    const skip = !excluded.has(seq);
+    if (skip) excluded.add(seq); else excluded.delete(seq);
+    tr.classList.toggle('is-skipped', skip);
+    tr.querySelectorAll('[data-field]').forEach((input) => { input.disabled = skip; });
+    btn.setAttribute('aria-pressed', String(skip));
+    btn.textContent = skip ? '↺ Batalkan' : '✕ Lewati';
+    showSkipped();
+  });
+
   $('#commitBtn', box).addEventListener('click', async () => {
-    const stillUnknown = fresh.filter((r) => !(overrides[r.seq]?.pos_id ?? r.pos_id)).length;
+    const saving = fresh.filter((r) => !excluded.has(r.seq));
+    const stillUnknown = saving.filter((r) => !(overrides[r.seq]?.pos_id ?? r.pos_id)).length;
     if (stillUnknown && !confirm(`${stillUnknown} transaksi belum punya pos. Tetap simpan? (bisa dialokasikan nanti di Draf)`)) return;
     let result;
-    const ok = await attempt(async () => { result = await api.post('/imports/commit', { ...request(), overrides }); });
+    const sent = request(); // dibaca sekarang: sesudah simpan, isi panel (pilihan sheet/akun) diganti pesan hasil
+    const ok = await attempt(async () => { result = await api.post('/imports/commit', { ...sent, overrides, exclude: [...excluded] }); });
     if (!ok) return;
-    const month = Number(fresh[0]?.date.slice(5, 7)) || defaultMonth();
+    const month = Number(saving[0]?.date.slice(5, 7)) || defaultMonth();
     render(panel, html`
-      <p class="notice notice-ok">✓ ${result.added} transaksi tersimpan${result.skipped ? `, ${result.skipped} dilewati karena sudah ada` : ''}.</p>
+      <p class="notice notice-ok">✓ ${result.added} transaksi tersimpan${result.skipped ? `, ${result.skipped} dilewati karena sudah ada` : ''}${result.excluded ? `, ${result.excluded} tidak dicatat (Lewati)` : ''}.</p>
       <div class="toolbar">
         <a class="btn btn-primary" href="#/draf?month=${month}">Lanjut ke 2. Draf →</a>
         <button id="importMore">Impor file lain</button>
       </div>`);
-    $('#importMore', panel).addEventListener('click', () => renderDropzone(panel, request().account_id));
-    renderImported($('#mutasiList'), request().account_id, Number($('#monthSel').value));
+    $('#importMore', panel).addEventListener('click', () => renderDropzone(panel, sent.account_id));
+    renderImported($('#mutasiList'), sent.account_id, Number($('#monthSel').value));
   });
 }

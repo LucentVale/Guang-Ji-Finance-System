@@ -100,16 +100,24 @@ module.exports = function importService({ db, repos, services }) {
 
     /**
      * overrides: { [seq]: { pos_id, category, name } } — koreksi alokasi dari layar preview.
-     * Mengembalikan jumlah baris yang tersimpan dan yang dilewati (sudah pernah diimpor).
+     * exclude: [seq] — baris yang sengaja tidak disimpan (dipilih "Lewati" di preview). Tidak diingat:
+     * bila file yang sama diimpor ulang, baris itu muncul lagi sebagai baris baru.
+     * Mengembalikan jumlah baris yang tersimpan, yang dilewati karena sudah pernah diimpor (skipped),
+     * dan yang sengaja tidak disimpan (excluded).
      */
-    commit(fothangId, { token, sheet, year, account_id: accountId, overrides = {} }) {
+    commit(fothangId, { token, sheet, year, account_id: accountId, overrides = {}, exclude = [] }) {
       const account = bankAccount(fothangId, accountId);
       const rows = classifiedRows(fothangId, getUpload(fothangId, token), sheet, year, account.id);
       const posIds = new Set(repos.pos.listByFothang(fothangId, { includeInactive: true }).map((p) => p.id));
+      if (!Array.isArray(exclude)) throw badRequest('Daftar baris yang dilewati tidak valid');
+      const excluded = new Set(exclude.map(Number));
+      const seqs = new Set(rows.map((r) => r.seq));
+      for (const seq of excluded) if (!seqs.has(seq)) throw badRequest(`Baris ${seq} yang dilewati tidak ada di file`);
 
       let added = 0;
       inTransaction(db, () => {
         for (const row of rows) {
+          if (excluded.has(row.seq)) continue;
           const fix = overrides[row.seq] || {};
           const posId = 'pos_id' in fix ? Number(fix.pos_id) || null : row.pos_id;
           if (posId && !posIds.has(posId)) throw badRequest(`Pos tidak valid pada baris ${row.seq}`);
@@ -133,7 +141,7 @@ module.exports = function importService({ db, repos, services }) {
           }
         }
       });
-      return { added, skipped: rows.length - added };
+      return { added, skipped: rows.length - excluded.size - added, excluded: excluded.size };
     },
 
     /**
