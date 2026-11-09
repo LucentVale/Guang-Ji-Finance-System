@@ -1,13 +1,14 @@
 // Halaman Data, tab "Semua transaksi": semua transaksi setahun dengan cari & saringan,
-// total mengikuti saringan, ganti pos banyak baris sekaligus, dan ekspor Excel sesuai saringan.
+// total mengikuti saringan, tambah / ubah transaksi, pindahan antar pos, ganti pos banyak baris sekaligus,
+// dan ekspor Excel sesuai saringan.
 import { $, html, render, on } from '../core/dom.js';
 import { api } from '../core/api.js';
 import { store } from '../core/store.js';
-import { money, dateShort } from '../core/format.js';
+import { money, dateShort, todayIso } from '../core/format.js';
 import { attempt } from '../components/feedback.js';
 import { posOptions, monthOptions } from '../components/options.js';
 import { segmented, bindSegmented, debounce, SEARCH_DELAY_MS } from '../components/controls.js';
-import { openTransactionForm, openTransactionDetail } from '../components/transactionForms.js';
+import { openTransactionForm, openTransactionDetail, openTransferForm } from '../components/transactionForms.js';
 
 const SOURCES = { mutasi: 'Mutasi bank', draf: 'File DRAF', manual: 'Input manual', pindahan: 'Pindahan' };
 // Saringan yang disimpan di alamat halaman (supaya tetap sama sesudah memuat ulang).
@@ -17,6 +18,13 @@ const PAGE_ROWS = 300;
 
 const round = (x) => Math.round(x * 100) / 100;
 const sum = (rows, field) => round(rows.reduce((t, r) => t + r[field], 0));
+
+/** Tanggal awal transaksi baru: hari ini bila masuk saringan bulan/tahun, selain itu tanggal 1 bulan terpilih (atau 1 Januari). */
+function newDate(month) {
+  const today = todayIso();
+  const prefix = month ? `${store.year}-${String(month).padStart(2, '0')}` : String(store.year);
+  return today.startsWith(prefix) ? today : `${store.year}-${String(month || 1).padStart(2, '0')}-01`;
+}
 
 export async function transaksiTab(root, params) {
   const filters = Object.fromEntries(FILTER_KEYS.map((k) => [k, params.get(k) || '']));
@@ -82,7 +90,11 @@ export async function transaksiTab(root, params) {
         <span class="badge badge-red">Keluar Rp ${money(keluar)}</span>
         <span class="badge">Selisih Rp ${money(round(masuk - keluar))}</span>
       </div>
-      <a class="btn" href="${api.downloadUrl('/export/transaksi.xlsx', query())}" title="Daftar transaksi sesuai saringan yang aktif">⭳ Excel</a>`);
+      <div class="toolbar">
+        <button type="button" class="btn-primary" id="txAdd" data-write>+ Transaksi</button>
+        <button type="button" id="txTransfer" data-write>⇄ Pindahan Pos</button>
+        <a class="btn" href="${api.downloadUrl('/export/transaksi.xlsx', query())}" title="Daftar transaksi sesuai saringan yang aktif">⭳ Excel</a>
+      </div>`);
   }
 
   function drawBulk() {
@@ -104,6 +116,7 @@ export async function transaksiTab(root, params) {
       <thead><tr>
         ${canWrite ? html`<th><input type="checkbox" id="selAll" aria-label="Pilih semua baris yang tampil" ${allOn ? 'checked' : ''}></th>` : ''}
         <th>Tgl</th><th>Akun</th><th>Pos</th><th>Kategori</th><th>Nama / Uraian</th><th class="num">Masuk</th><th class="num">Keluar</th><th>Sumber</th>
+        ${canWrite ? html`<th><span class="sr-only">Ubah</span></th>` : ''}
       </tr></thead>
       <tbody>${visible.length ? visible.map((r) => html`
         <tr class="clickable ${r.pos_id ? '' : 'row-warn'}" data-id="${r.id}">
@@ -117,7 +130,9 @@ export async function transaksiTab(root, params) {
           <td class="num in">${r.masuk ? money(r.masuk) : ''}</td>
           <td class="num out">${r.keluar ? money(r.keluar) : ''}</td>
           <td class="muted nowrap">${SOURCES[r.source] || r.source}</td>
-        </tr>`) : html`<tr><td colspan="9" class="empty">Tidak ada transaksi yang cocok dengan saringan.</td></tr>`}
+          ${canWrite ? html`<td data-stop><button type="button" class="btn-ghost btn-small nowrap" data-edit="${r.id}"
+            aria-label="${r.source === 'pindahan' ? 'Buka' : 'Ubah'} ${dateShort(r.date)} ${r.name}">${r.source === 'pindahan' ? 'Buka' : '✎ Ubah'}</button></td>` : ''}
+        </tr>`) : html`<tr><td colspan="10" class="empty">Tidak ada transaksi yang cocok dengan saringan.</td></tr>`}
       </tbody>`);
     render($('#txMore', root), rows.length > shown
       ? html`<button type="button" id="showMore">Tampilkan ${Math.min(PAGE_ROWS, rows.length - shown)} lagi (${rows.length - shown} tersisa)</button>` : '');
@@ -144,6 +159,7 @@ export async function transaksiTab(root, params) {
     const tx = rows.find((r) => r.id === Number(tr.dataset.id));
     if (canWrite) openTransactionForm(tx, { onSaved: load }); else openTransactionDetail(tx);
   });
+  on(table, 'click', '[data-edit]', (e, btn) => openTransactionForm(rows.find((r) => r.id === Number(btn.dataset.edit)), { onSaved: load }));
   on(table, 'change', '[data-sel]', (e, box) => {
     if (box.checked) selected.add(Number(box.dataset.sel)); else selected.delete(Number(box.dataset.sel));
     drawBulk();
@@ -156,6 +172,17 @@ export async function transaksiTab(root, params) {
     drawTable();
   });
   on(root, 'click', '#showMore', () => { shown += PAGE_ROWS; drawTable(); });
+
+  // ---- tambah transaksi / pindahan antar pos
+  on(root, 'click', '#txAdd', () => openTransactionForm(null, {
+    posId: filters.pos_id && filters.pos_id !== 'none' ? Number(filters.pos_id) : undefined,
+    defaults: { date: newDate(filters.month) },
+    onSaved: load,
+  }));
+  on(root, 'click', '#txTransfer', () => openTransferForm({
+    fromPosId: filters.pos_id && filters.pos_id !== 'none' ? Number(filters.pos_id) : undefined,
+    onSaved: load,
+  }));
 
   // ---- ganti pos banyak baris
   on(root, 'click', '#bulkClear', () => { selected.clear(); drawBulk(); drawTable(); });
