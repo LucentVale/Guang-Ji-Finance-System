@@ -2,9 +2,13 @@
 //   - Laporan Keuangan Tahunan  (sheet Tabel, lalu satu sheet per pos)
 //   - Draf Laporan Keuangan      (satu sheet per bulan, urutan rekening koran)
 //   - Laporan Bulanan            (Bentuk Laporan Keuangan, satu sheet per bulan)
+//   - Template Data              (bentuk seragam untuk semua vihara, lihat templateFormat.js)
 const ExcelJS = require('exceljs');
-const { monthName, dayOf } = require('../lib/period');
+const { monthName, dayOf, monthRange } = require('../lib/period');
+const { toRupiah } = require('../lib/money');
 const { buildDrafWorkbook } = require('./drafFormat');
+const { buildTemplateWorkbook } = require('./templateFormat');
+const { assertOwned } = require('./guards');
 
 const NUMBER_FORMAT = '#,##0.00_);[Red](#,##0.00)';
 const BOLD = { bold: true };
@@ -208,6 +212,69 @@ module.exports = function excelExport({ repos, services }) {
         ws.pageSetup = { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 };
       }
       return Buffer.from(await wb.xlsx.writeBuffer());
+    },
+
+    /**
+     * Template Data (lihat templateFormat.js): kosong, atau berisi transaksi satu tahun / satu bulan.
+     * Pindahan antar pos tidak ikut: template hanya untuk uang yang benar-benar masuk/keluar akun.
+     * Saldo bank baris yang dipecah ditulis di pecahan terakhirnya (di situlah saldo bank bisa dicocokkan).
+     * @param {object} p
+     * @param {number} p.year
+     * @param {number} [p.month] kosong = setahun
+     * @param {number} [p.accountId] kosong = semua akun
+     * @param {boolean} [p.empty] true = hanya kerangka (judul kolom, daftar pilihan, petunjuk)
+     */
+    async templateWorkbook(fothangId, { year, month, accountId, empty = false }) {
+      const fothang = repos.fothang.findById(fothangId);
+      const allPos = repos.pos.listByFothang(fothangId, { includeInactive: true });
+      const accounts = repos.account.listByFothang(fothangId);
+      if (accountId) assertOwned(repos.account.findById(accountId), fothangId, 'Akun');
+      const posById = new Map(allPos.map((p) => [p.id, p]));
+      const accountById = new Map(accounts.map((a) => [a.id, a]));
+
+      const from = `${year}-${month ? String(month).padStart(2, '0') : '01'}-01`;
+      const to = month ? monthRange(year, month).to : `${year + 1}-01-01`;
+      const source = empty ? [] : repos.transaction.list({ fothangId, from, to, accountId: accountId || null })
+        .filter((t) => t.source !== 'pindahan');
+      const group = (t) => t.split_of ?? t.id;
+      const lastOfGroup = new Map(source.map((t, i) => [group(t), i]));
+      const bankBalance = new Map(source.filter((t) => t.balance_cents != null).map((t) => [group(t), t.balance_cents]));
+
+      const rows = source.map((t, i) => ({
+        date: t.date,
+        account: accountById.get(t.account_id)?.name ?? '',
+        pos: posById.get(t.pos_id)?.code ?? '',
+        category: t.category,
+        name: t.name,
+        masuk: t.amount_cents > 0 ? toRupiah(t.amount_cents) : 0,
+        keluar: t.amount_cents < 0 ? toRupiah(-t.amount_cents) : 0,
+        saldo_bank: lastOfGroup.get(group(t)) === i && bankBalance.has(group(t)) ? toRupiah(bankBalance.get(group(t))) : null,
+        receipt_no: t.receipt_no,
+        piao_wen: t.piao_wen,
+        note: t.note,
+      }));
+
+      // Daftar pilihan: pos aktif, ditambah pos nonaktif yang masih dipakai data di file ini.
+      const usedPos = new Set(source.map((t) => t.pos_id));
+      const categories = repos.transaction.categories(fothangId).filter((c) => !c.startsWith('PINDAHAN'));
+
+      // Sheet Saldo Awal: pos aktif + pos nonaktif yang masih punya saldo awal.
+      const openingCents = new Map(repos.pos.openingsByFothang(fothangId).map((o) => [`${o.pos_id}:${o.account_id}`, o.amount_cents]));
+      const openingOf = (p, a) => openingCents.get(`${p.id}:${a.id}`) || 0;
+      const openingPos = allPos.filter((p) => p.active || accounts.some((a) => openingOf(p, a)));
+      return buildTemplateWorkbook({
+        orgName: fothang.name,
+        pos: allPos.filter((p) => p.active || usedPos.has(p.id)).map((p) => ({ code: p.code, name: p.name })),
+        accounts: accounts.map((a) => ({ name: a.name })),
+        categories,
+        rows,
+        openings: {
+          startDate: fothang.start_date,
+          accounts: accounts.map((a) => ({ name: a.name })),
+          rows: openingPos.map((p) => ({ code: p.code, name: p.name, values: accounts.map((a) => toRupiah(openingOf(p, a))) })),
+          accountOpenings: accounts.map((a) => toRupiah(a.opening_cents)),
+        },
+      });
     },
 
     async transactionsWorkbook(rows) {

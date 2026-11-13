@@ -15,11 +15,13 @@ module.exports = function reconciliationService({ repos, services }) {
   function statementOpening(accountId, from, monthRows) {
     const previous = repos.transaction.lastStatementBalance(accountId, from);
     if (previous) return previous.balance_cents;
-    const first = monthRows.find((r) => r.source === 'mutasi' && r.balance_cents != null);
-    if (!first) return null;
-    // Nominal asli di rekening koran = baris asal + semua pecahannya.
-    const bankAmount = sumCents(monthRows.filter((r) => r.id === first.id || r.split_of === first.id));
-    return first.balance_cents - bankAmount;
+    const index = monthRows.findIndex((r) => r.balance_cents != null);
+    if (index < 0) return null;
+    const first = monthRows[index];
+    // Mutasi: nominal asli di rekening koran = baris asal + semua pecahannya (pecahan tercatat sesudah baris asal).
+    if (first.source === 'mutasi') return first.balance_cents - sumCents(monthRows.filter((r) => r.id === first.id || r.split_of === first.id));
+    // Template Data: saldo bank ditulis di baris terakhir sebuah transaksi bank, jadi kurangi semua baris sampai baris itu.
+    return first.balance_cents - sumCents(monthRows.slice(0, index + 1).filter((r) => r.source !== 'pindahan'));
   }
 
   return {
@@ -37,7 +39,8 @@ module.exports = function reconciliationService({ repos, services }) {
         const draf = services.ledger.draf(fothangId, account.id, year, month);
         const mismatchRows = draf.rows.filter((r) => r.match === false).length;
         const isBank = account.kind === 'bank';
-        const hasMutasi = rows.some((r) => r.source === 'mutasi');
+        // Ada data rekening koran: baris mutasi, atau baris Template Data yang membawa Saldo Bank.
+        const hasMutasi = rows.some((r) => r.source === 'mutasi' || r.balance_cents != null);
         const stmtOpening = isBank && hasMutasi ? statementOpening(account.id, from, rows) : null;
         const stmtClosing = isBank && hasMutasi ? repos.transaction.lastStatementBalance(account.id, to)?.balance_cents ?? null : null;
 

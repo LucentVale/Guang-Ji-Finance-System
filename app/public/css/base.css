@@ -182,6 +182,9 @@ label.check { flex-direction: row; align-items: center; gap: 7px; color: var(--t
 
 .notice { padding: 10px 14px; border-radius: var(--radius); border: 1px solid var(--warn-line); background: var(--warn-soft); color: var(--warn); margin-bottom: var(--space-3); }
 .notice-ok { border-color: var(--green-line); background: var(--green-soft); color: var(--green); }
+.notice-error { border-color: var(--red-line); background: var(--red-soft); color: var(--red-dark); }
+/* Daftar galat per baris (impor Template Data): dibatasi tingginya supaya dialog tetap ringkas. */
+.error-list { margin: var(--space-2) 0 0; padding-left: 1.2em; max-height: 160px; overflow: auto; }
 .empty { padding: 36px; text-align: center; color: var(--muted); }
 
 /* Modal & toast */

@@ -15,4 +15,9 @@ module.exports = function register(router, { services }) {
   router.post(`${base}/draf/preview`, ({ params, body }) => services.imports.previewDraf(params.fothangId, body), { audit: false });
   router.post(`${base}/draf/commit`, ({ params, body }) => services.imports.commitDraf(params.fothangId, body),
     { audit: 'Mengimpor file DRAF (mengganti data bulan terpilih)' });
+
+  // Template Data (upload juga memakai endpoint upload yang sama).
+  router.post(`${base}/template/preview`, ({ params, body }) => services.imports.previewTemplate(params.fothangId, body), { audit: false });
+  router.post(`${base}/template/commit`, ({ params, body }) => services.imports.commitTemplate(params.fothangId, body),
+    { audit: 'Mengimpor Template Data (mengganti data bulan terpilih)' });
 };

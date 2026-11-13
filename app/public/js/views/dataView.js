@@ -3,12 +3,13 @@
 //   - Semua transaksi: cari & saring setahun, ganti pos banyak baris, ekspor Excel (dataTransaksi.js)
 //   - Donatur: daftar per nama, riwayat, gabungkan ejaan nama (dataDonatur.js)
 //   - Kategori: jumlah & total per kategori, ganti nama / gabungkan (dataKategori.js)
+// Ditambah tombol "Template Data" untuk mengunduh file berbentuk seragam (kosong atau berisi data).
 import { $, html, render, on } from '../core/dom.js';
 import { api } from '../core/api.js';
 import { store } from '../core/store.js';
 import { money, dateShort, MONTHS } from '../core/format.js';
 import { attempt, openModal, toast } from '../components/feedback.js';
-import { accountOptions, defaultMonth } from '../components/options.js';
+import { accountOptions, defaultMonth, monthOptions } from '../components/options.js';
 import { transaksiTab } from './dataTransaksi.js';
 import { donaturTab } from './dataDonatur.js';
 import { kategoriTab } from './dataKategori.js';
@@ -31,12 +32,56 @@ export async function dataView(main, params) {
         <h1>Data</h1>
         <p class="sub">Kelola data yang sudah tersimpan. Setiap penghapusan tercatat di Riwayat.</p>
       </div>
+      <div class="toolbar">
+        <button type="button" id="openTemplate" title="File Excel berbentuk seragam untuk semua vihara">⭳ Template Data</button>
+      </div>
     </div>
     <nav class="data-tabs" aria-label="Bagian halaman Data">
       ${TABS.map((t) => html`<a href="#/data?tab=${t.id}" class="${t === tab ? 'on' : ''}" ${t === tab ? 'aria-current="page"' : ''}>${t.label}</a>`)}
     </nav>
     <div id="dataTab"></div>`);
+  $('#openTemplate', main).addEventListener('click', openTemplateDialog);
   await tab.render($('#dataTab', main), params, () => dataView(main, params));
+}
+
+// ---------------------------------------------------------------- Template Data
+
+/** Dialog unduh Template Data: kosong (untuk diisi vihara) atau berisi data setahun / sebulan. */
+function openTemplateDialog() {
+  const { root, close } = openModal({
+    title: 'Unduh Template Data',
+    body: html`
+      <p>File Excel berbentuk seragam untuk semua vihara: satu baris satu transaksi, dengan petunjuk pengisian
+        dan pilihan Pos/Akun/Kategori milik Fothang ini.</p>
+      <form class="form-grid" id="templateForm">
+        <label class="full">Isi file
+          <select name="kosong">
+            <option value="1">Kosong — untuk diisi</option>
+            <option value="0">Berisi data yang sudah ada</option>
+          </select>
+        </label>
+        <label>Bulan
+          <select name="month" disabled>${monthOptions('', { empty: `Setahun ${store.year}` })}</select>
+        </label>
+        <label>Akun
+          <select name="account_id" disabled><option value="">Semua akun</option>${accountOptions('')}</select>
+        </label>
+      </form>
+      <p class="muted">Pindahan antar pos tidak ikut di template.</p>`,
+    footer: html`<button type="button" data-close>Batal</button>
+      <a class="btn btn-primary" id="templateDownload" href="#">⭳ Unduh</a>`,
+  });
+  const form = $('#templateForm', root);
+  const link = $('#templateDownload', root);
+  const update = () => {
+    const empty = form.kosong.value === '1';
+    form.month.disabled = form.account_id.disabled = empty;
+    const query = empty ? { year: store.year, kosong: 1 } : { year: store.year, month: form.month.value, account_id: form.account_id.value };
+    link.href = api.downloadUrl('/export/template.xlsx', query);
+  };
+  form.addEventListener('change', update);
+  link.addEventListener('click', () => setTimeout(close));
+  update();
 }
 
 // ---------------------------------------------------------------- Mutasi per bulan

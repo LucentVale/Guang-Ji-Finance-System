@@ -21,6 +21,9 @@
   .sum-card b { font-size: var(--fs-base); white-space: normal; overflow-wrap: anywhere; }
 }
 .sheet-scroll { overflow: auto; max-height: calc(100vh - 290px); min-height: 280px; }
+/* Tabel pratinjau di dalam dialog impor. */
+.sheet-scroll-short { max-height: 45vh; min-height: 0; }
+.sheet .col-pos { width: 170px; }
 /* Laporan per Pos: tabel mengisi sisa tinggi panel (bukan tinggi tetap). */
 main.view-fill .workbook { flex: 1; min-height: 0; }
 main.view-fill .sheet-scroll { flex: 1; min-height: 220px; max-height: none; }

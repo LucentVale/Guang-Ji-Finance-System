@@ -47,6 +47,17 @@ module.exports = function register(router, { db, repos, services }) {
     return reply.file(buffer, `Bentuk Laporan Keuangan ${fileLabel(params.fothangId, year, query.month)}.xlsx`, MIME.xlsx);
   });
 
+  // Template Data: ?kosong=1 untuk kerangka saja; selain itu berisi data tahun (dan bulan / akun bila dipilih).
+  router.get(`${base}/template.xlsx`, async ({ params, query }) => {
+    const year = assertYear(query.year);
+    const month = query.month ? assertMonth(query.month) : null;
+    const empty = query.kosong === '1';
+    const accountId = query.account_id ? Number(query.account_id) : null;
+    const buffer = await services.excel.templateWorkbook(params.fothangId, { year, month, accountId, empty });
+    const label = empty ? services.fothang.get(params.fothangId).short_name : fileLabel(params.fothangId, year, month);
+    return reply.file(buffer, `Template Data ${label}${empty ? ' (kosong)' : ''}.xlsx`, MIME.xlsx);
+  });
+
   router.get(`${base}/transaksi.xlsx`, async ({ params, query }) => {
     const buffer = await services.excel.transactionsWorkbook(services.transaction.list(params.fothangId, query));
     return reply.file(buffer, 'Daftar Transaksi.xlsx', MIME.xlsx);

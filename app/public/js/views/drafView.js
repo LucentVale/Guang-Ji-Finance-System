@@ -53,7 +53,7 @@ export async function drafView(main, params) {
       </div>
       <div class="toolbar">
         <button id="addRow" data-write title="Tambah transaksi baru di bulan ini">+ Baris</button>
-        <button id="importDraf" data-write title="Isi data dari file DRAF Laporan Keuangan (.xlsx)">⇪ Impor File DRAF</button>
+        <button id="importDraf" data-write title="Isi data dari file DRAF Laporan Keuangan atau Template Data (.xlsx)">⇪ Impor DRAF / Template</button>
         <a class="btn" href="${api.downloadUrl('/export/draf.xlsx', { account_id: accountId, year: store.year })}"
            title="File DRAF Januari s.d. bulan terakhir yang berisi data, format sama dengan file manual">⭳ Excel Draf</a>
         <a class="btn btn-primary" href="#/tahunan">Lanjut ke 3. Laporan per Pos →</a>
@@ -113,7 +113,9 @@ export async function drafView(main, params) {
   });
   $('#importDraf')?.addEventListener('click', () => openDrafImport({
     accountId,
-    onSaved: (months) => go({ month: months.includes(month) ? month : months[0] }),
+    // Bulan yang sedang dibuka ikut diimpor (atau hanya saldo awal yang diubah): alamat halaman tidak berubah,
+    // jadi muat ulang langsung; selain itu pindah ke bulan pertama yang diimpor.
+    onSaved: (months) => (!months.length || months.includes(month) ? reload() : go({ month: months[0] })),
   }));
   on(table, 'change', '[data-assign]', async (e, select) => {
     await attempt(() => api.post('/transactions/assign-pos', { ids: [Number(select.dataset.assign)], pos_id: select.value || null }), 'Pos disimpan');

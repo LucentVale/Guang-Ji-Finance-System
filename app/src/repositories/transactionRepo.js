@@ -55,10 +55,13 @@ module.exports = function transactionRepo(db) {
     /** Urutan (seq) terbesar di satu akun pada satu tanggal; baris baru diberi seq sesudahnya supaya tampil paling bawah. */
     lastSeqOn: (accountId, date) => db.prepare('SELECT COALESCE(MAX(seq), 0) AS s FROM transactions WHERE account_id = ? AND date = ?').get(accountId, date).s,
 
-    /** Saldo rekening koran terakhir sebelum tanggal tertentu (baris mutasi terakhir). */
+    /**
+     * Saldo rekening koran terakhir sebelum tanggal tertentu: baris terakhir yang membawa saldo bank
+     * (baris mutasi, atau baris Template Data yang kolom Saldo Bank-nya diisi).
+     */
     lastStatementBalance(accountId, before) {
       return db.prepare(`SELECT date, balance_cents FROM transactions
-                         WHERE account_id = ? AND source = 'mutasi' AND balance_cents IS NOT NULL AND date < ?
+                         WHERE account_id = ? AND balance_cents IS NOT NULL AND date < ?
                          ORDER BY date DESC, seq DESC, id DESC LIMIT 1`).get(accountId, before) || null;
     },
 

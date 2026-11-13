@@ -1,7 +1,8 @@
 // Impor data dalam 3 langkah: upload -> preview (periksa & alokasikan) -> commit.
-// Dua jenis file:
+// Tiga jenis file:
 //   - Mutasi bank (rekening koran): baris baru ditambahkan, baris yang sudah pernah diimpor dilewati.
 //   - File DRAF Laporan Keuangan: data bulan yang dipilih DIGANTI seluruhnya dengan isi file.
+//   - Template Data (bentuk seragam semua vihara): sama seperti DRAF, tetapi akun ditentukan per baris.
 // File yang di-upload disimpan sementara di memori. Saat commit, file dibaca ULANG di server,
 // jadi tanggal & nominal tidak bisa diubah dari browser; yang dikirim hanya koreksi alokasi.
 
@@ -13,6 +14,7 @@ const { assertYear, monthRange, assertMonth } = require('../lib/period');
 const { clean, upper } = require('../lib/text');
 const parser = require('./mutasiParser');
 const { parseDrafSheet } = require('./drafFormat');
+const { parseTemplateSheet, findTemplateSheet, parseOpeningsSheet } = require('./templateFormat');
 const { classify, buildAliasIndex } = require('./classifier');
 const { assertOwned } = require('./guards');
 
@@ -77,6 +79,111 @@ module.exports = function importService({ db, repos, services }) {
     return { ...parsed, rows: rows.filter((r) => r.amount_cents !== 0) };
   }
 
+  /**
+   * Baca Template Data lalu cocokkan Akun & Pos dengan data Fothang.
+   *   Akun: nama akun (huruf besar/kecil bebas); boleh kosong bila Fothang hanya punya satu akun.
+   *   Pos : kode, nama, atau kata kunci pos (alias "PAT WU AI LIU=Wu Ai Liu" sekaligus mengisi kategori bila kosong).
+   * Pos yang tidak dikenal tidak menggagalkan impor (bisa dipilih di pratinjau); akun yang tidak dikenal
+   * dan baris yang salah isi menjadi `errors`, dan selama masih ada `errors` file tidak bisa disimpan.
+   */
+  function templateRows(fothangId, upload) {
+    const worksheet = findTemplateSheet(upload.workbook);
+    if (!worksheet) throw badRequest('File ini bukan Template Data (judul kolom Tanggal, Pos, Masuk/Keluar tidak ditemukan)');
+    const parsed = parseTemplateSheet(worksheet);
+
+    const accounts = repos.account.listByFothang(fothangId);
+    const accountByName = new Map(accounts.map((a) => [upper(a.name), a]));
+    const allPos = repos.pos.listByFothang(fothangId, { includeInactive: true });
+    const aliasIndex = buildAliasIndex(allPos);
+    for (const p of allPos) if (!aliasIndex.has(upper(p.name))) aliasIndex.set(upper(p.name), { posId: p.id, category: '' });
+
+    const errors = [...parsed.errors];
+    const rows = [];
+    parsed.rows.forEach((r, i) => {
+      const account = r.account ? accountByName.get(upper(r.account)) : accounts.length === 1 ? accounts[0] : null;
+      if (!account) {
+        errors.push({ row: r.row, message: r.account ? `akun "${r.account}" tidak ada di Fothang ini` : 'kolom Akun kosong (Fothang ini punya lebih dari satu akun)' });
+        return;
+      }
+      const hit = r.pos ? aliasIndex.get(upper(r.pos)) : null;
+      rows.push({
+        ...r,
+        seq: i + 1,
+        month: Number(r.date.slice(5, 7)),
+        account_id: account.id,
+        account: account.name,
+        pos_id: hit?.posId ?? null,
+        pos_unknown: !hit,
+        category: r.category || hit?.category || '',
+        amount_cents: toCents(r.masuk) - toCents(r.keluar),
+        balance_cents: r.saldo_bank == null ? null : toCents(r.saldo_bank),
+      });
+    });
+    errors.sort((a, b) => a.row - b.row);
+    return { sheet: worksheet.name, rows, errors };
+  }
+
+  /**
+   * Sheet Saldo Awal Template Data (null bila tidak ada): dicocokkan dengan pos & akun Fothang,
+   * lalu dibandingkan dengan saldo awal sekarang. Hanya nilai yang BERBEDA yang masuk `changes`.
+   * Pos & akun harus sudah ada (ditambahkan di Pengaturan); yang tidak dikenal menjadi `errors`.
+   */
+  function templateOpenings(fothangId, upload) {
+    const sheet = parseOpeningsSheet(upload.workbook);
+    if (!sheet) return null;
+    const fothang = repos.fothang.findById(fothangId);
+    const errors = [...sheet.errors];
+    const accounts = repos.account.listByFothang(fothangId);
+    const accountByName = new Map(accounts.map((a) => [upper(a.name), a]));
+    const columns = sheet.accounts.map((name) => {
+      const account = accountByName.get(upper(name));
+      if (!account) errors.push({ row: 0, message: `kolom akun "${name}" tidak ada di Fothang ini` });
+      return account || null;
+    });
+    const allPos = repos.pos.listByFothang(fothangId, { includeInactive: true });
+    const posByKey = new Map();
+    for (const p of allPos) for (const key of [p.code, p.name]) if (!posByKey.has(upper(key))) posByKey.set(upper(key), p);
+    const current = new Map(repos.pos.openingsByFothang(fothangId).map((o) => [`${o.pos_id}:${o.account_id}`, o.amount_cents]));
+
+    const changes = [];
+    const seen = new Set();
+    const posCents = new Map(accounts.map((a) => [a.id, allPos.reduce((s, p) => s + (current.get(`${p.id}:${a.id}`) || 0), 0)]));
+    for (const r of sheet.rows) {
+      const pos = posByKey.get(upper(r.pos));
+      if (!pos) { errors.push({ row: r.row, message: `pos "${r.pos}" tidak ada — tambahkan dulu di Pengaturan` }); continue; }
+      if (seen.has(pos.id)) { errors.push({ row: r.row, message: `pos "${r.pos}" tertulis dua kali` }); continue; }
+      seen.add(pos.id);
+      columns.forEach((account, j) => {
+        if (!account) return;
+        const before = current.get(`${pos.id}:${account.id}`) || 0;
+        const after = toCents(r.values[j]);
+        posCents.set(account.id, posCents.get(account.id) - before + after);
+        if (before !== after) changes.push({ pos_id: pos.id, pos: pos.code, account_id: account.id, account: account.name, before: toRupiah(before), after: toRupiah(after) });
+      });
+    }
+    const accountChanges = [];
+    const accountCents = new Map(accounts.map((a) => [a.id, a.opening_cents]));
+    if (sheet.account_openings) {
+      columns.forEach((account, j) => {
+        if (!account) return;
+        const after = toCents(sheet.account_openings[j]);
+        accountCents.set(account.id, after);
+        if (after !== account.opening_cents) accountChanges.push({ account_id: account.id, account: account.name, before: toRupiah(account.opening_cents), after: toRupiah(after) });
+      });
+    }
+    // Sesudah diterapkan: jumlah saldo awal pos per akun vs saldo awal akun (harus sama agar Cek Saldo lolos).
+    const totals = accounts.map((a) => ({
+      account_id: a.id, account: a.name, pos_total: toRupiah(posCents.get(a.id)), account_opening: toRupiah(accountCents.get(a.id)),
+      diff: toRupiah(posCents.get(a.id) - accountCents.get(a.id)),
+    }));
+    errors.sort((a, b) => a.row - b.row);
+    return { start_date: fothang.start_date, changes, account_changes: accountChanges, totals, errors };
+  }
+
+  /** "2026-10" dari tanggal ISO; kunci bulan untuk Template Data (file boleh berisi lebih dari satu tahun). */
+  const monthKey = (date) => date.slice(0, 7);
+  const rangeOfKey = (key) => monthRange(Number(key.slice(0, 4)), Number(key.slice(5, 7)));
+
   function drafAccount(fothangId, accountId) {
     return assertOwned(repos.account.findById(Number(accountId)), fothangId, 'Akun');
   }
@@ -90,7 +197,8 @@ module.exports = function importService({ db, repos, services }) {
       }
       const token = crypto.randomUUID();
       uploads.set(token, { fothangId, workbook, fileName, createdAt: Date.now() });
-      return { token, file_name: fileName, sheets: parser.listSheets(workbook, fileName) };
+      // is_template: file ini Template Data (bukan file DRAF / mutasi), supaya layar impor bisa memilih alurnya sendiri.
+      return { token, file_name: fileName, sheets: parser.listSheets(workbook, fileName), is_template: !!findTemplateSheet(workbook) };
     },
 
     preview(fothangId, { token, sheet, year, account_id: accountId }) {
@@ -218,6 +326,106 @@ module.exports = function importService({ db, repos, services }) {
         }
       });
       return { added, replaced, months: [...chosen].sort((a, b) => a - b) };
+    },
+
+    /**
+     * Pratinjau Template Data: ringkasan per bulan & per akun (berapa baris, total, data lama yang akan diganti),
+     * baris hasil pencocokan, dan daftar baris yang salah.
+     */
+    previewTemplate(fothangId, { token }) {
+      const parsed = templateRows(fothangId, getUpload(fothangId, token));
+      const keys = [...new Set(parsed.rows.map((r) => monthKey(r.date)))].sort();
+      const months = keys.map((key) => {
+        const rows = parsed.rows.filter((r) => monthKey(r.date) === key);
+        const { from, to } = rangeOfKey(key);
+        const accountIds = [...new Set(rows.map((r) => r.account_id))];
+        return {
+          key,
+          year: Number(key.slice(0, 4)),
+          month: Number(key.slice(5, 7)),
+          count: rows.length,
+          masuk: toRupiah(sumCents(rows.filter((r) => r.amount_cents > 0))),
+          keluar: toRupiah(Math.abs(sumCents(rows.filter((r) => r.amount_cents < 0)))),
+          accounts: accountIds.map((id) => ({
+            account_id: id,
+            name: rows.find((r) => r.account_id === id).account,
+            count: rows.filter((r) => r.account_id === id).length,
+            existing: repos.transaction.countBySource(id, from, to),
+          })),
+        };
+      });
+      // openings: perbandingan sheet Saldo Awal dengan saldo awal sekarang (null bila file tidak punya sheet itu).
+      return { sheet: parsed.sheet, months, rows: parsed.rows, errors: parsed.errors, openings: templateOpenings(fothangId, getUpload(fothangId, token)) };
+    },
+
+    /**
+     * Simpan Template Data untuk bulan-bulan yang dipilih (months: ["2026-10", ...]).
+     * Per bulan, data akun-akun yang muncul di file pada bulan itu DIGANTI (seperti impor DRAF);
+     * pindahan antar pos dan akun yang tidak ada di file tidak disentuh. Ditolak bila file masih punya baris salah.
+     * overrides: { [seq]: { pos_id, category, name } }
+     * apply_openings: true = saldo awal pos & akun juga diganti dengan isi sheet Saldo Awal (boleh tanpa bulan).
+     */
+    commitTemplate(fothangId, { token, months = [], overrides = {}, apply_openings: applyOpenings = false }) {
+      const upload = getUpload(fothangId, token);
+      const parsed = templateRows(fothangId, upload);
+      if (parsed.errors.length) {
+        const first = parsed.errors[0];
+        throw badRequest(`File masih punya ${parsed.errors.length} baris yang salah (mis. baris ${first.row}: ${first.message}). Perbaiki di Excel lalu upload ulang.`);
+      }
+      const openings = applyOpenings ? templateOpenings(fothangId, upload) : null;
+      if (applyOpenings && !openings) throw badRequest('File ini tidak punya sheet Saldo Awal');
+      if (openings?.errors.length) {
+        const first = openings.errors[0];
+        throw badRequest(`Sheet Saldo Awal masih salah${first.row ? ` (baris ${first.row})` : ''}: ${first.message}`);
+      }
+      if (!Array.isArray(months)) throw badRequest('Daftar bulan tidak valid');
+      if (!months.length && !applyOpenings) throw badRequest('Pilih minimal satu bulan yang akan diimpor');
+      const chosen = new Set(months.map(String));
+      const inFile = new Set(parsed.rows.map((r) => monthKey(r.date)));
+      for (const key of chosen) if (!inFile.has(key)) throw badRequest(`Bulan ${key} tidak ada di file`);
+      const posIds = new Set(repos.pos.listByFothang(fothangId, { includeInactive: true }).map((p) => p.id));
+      const rows = parsed.rows.filter((r) => chosen.has(monthKey(r.date)));
+
+      let replaced = 0;
+      let added = 0;
+      inTransaction(db, () => {
+        for (const key of chosen) {
+          const { from, to } = rangeOfKey(key);
+          const accountIds = new Set(rows.filter((r) => monthKey(r.date) === key).map((r) => r.account_id));
+          for (const accountId of accountIds) replaced += repos.transaction.deleteForAccountPeriod(accountId, from, to);
+        }
+        for (const row of rows) {
+          const fix = overrides[row.seq] || {};
+          const posId = 'pos_id' in fix ? Number(fix.pos_id) || null : row.pos_id;
+          if (posId && !posIds.has(posId)) throw badRequest(`Pos tidak valid pada baris ${row.row}`);
+          repos.transaction.insert({
+            fothang_id: fothangId,
+            account_id: row.account_id,
+            pos_id: posId,
+            date: row.date,
+            category: 'category' in fix ? upper(fix.category) : row.category,
+            name: 'name' in fix ? clean(fix.name) : row.name,
+            amount_cents: row.amount_cents,
+            receipt_no: row.receipt_no,
+            piao_wen: row.piao_wen,
+            note: row.note,
+            source: 'draf',
+            balance_cents: row.balance_cents,
+            seq: row.seq,
+          });
+          added++;
+        }
+        if (openings) {
+          for (const c of openings.changes) repos.pos.setOpening(c.pos_id, c.account_id, toCents(c.after));
+          for (const c of openings.account_changes) {
+            const account = repos.account.findById(c.account_id);
+            repos.account.update(account.id, { ...account, opening_cents: toCents(c.after) });
+          }
+        }
+      });
+      const result = { added, replaced, months: [...chosen].sort() };
+      if (openings) result.openings_changed = openings.changes.length + openings.account_changes.length;
+      return result;
     },
   };
 };

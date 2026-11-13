@@ -1,29 +1,34 @@
 // Impor file "DRAF Laporan Keuangan" (.xlsx): pilih file -> pilih sheet & bulan -> periksa -> simpan.
+// File Template Data yang diunggah di dialog yang sama diteruskan ke templateImport.js.
 // Data bulan yang dipilih DIGANTI dengan isi file (bukan ditambahkan), supaya tidak dobel dengan hasil impor mutasi.
 import { $, $$, html, render, on } from '../core/dom.js';
 import { api } from '../core/api.js';
 import { money, dateId, MONTHS } from '../core/format.js';
 import { openModal, attempt, toast } from './feedback.js';
 import { accountOptions, posOptions } from './options.js';
+import { renderTemplateImport } from './templateImport.js';
 
 const SOURCE_LABEL = { mutasi: 'mutasi bank', draf: 'file DRAF', manual: 'input manual' };
 
 /** @param {{accountId: number, onSaved: (months: number[]) => void}} options */
 export function openDrafImport({ accountId, onSaved }) {
   const { root, close } = openModal({
-    title: 'Impor File DRAF Laporan Keuangan',
+    title: 'Impor File DRAF / Template Data',
     wide: true,
     body: html`
-      <p class="muted mt-0">Pilih file DRAF (mis. "DRAF Laporan Keuangan Kuang Hang 2026.xlsx"). Baris dibaca dari kolom
-        Tgl, Pos / Nama, Keterangan, No Kwitansi, Piao Wen, Masuk, dan Keluar.</p>
+      <p class="muted mt-0">Pilih file DRAF (mis. "DRAF Laporan Keuangan Kuang Hang 2026.xlsx") atau Template Data
+        (unduh dari halaman Data). Jenis file dikenali otomatis.</p>
       <label class="dropzone" id="drafDrop">
         <span class="icon-lg" aria-hidden="true">⇪</span>
-        <b>Klik untuk memilih file DRAF, atau seret ke sini</b>
+        <b>Klik untuk memilih file, atau seret ke sini</b>
         <input type="file" accept=".xlsx" hidden id="drafFile">
       </label>
       <div id="drafStep"></div>`,
     footer: html`<div></div><div class="toolbar"><button data-close>Tutup</button></div>`,
   });
+
+  // Template Data mengembalikan bulan berbentuk "2026-10"; halaman Draf memakai nomor bulan.
+  const onTemplateSaved = (keys) => onSaved(keys.map((k) => Number(k.slice(5, 7))));
 
   const zone = $('#drafDrop', root);
   const start = (file) => file && upload(file);
@@ -38,6 +43,7 @@ export function openDrafImport({ accountId, onSaved }) {
     let up;
     try { up = await api.upload('/imports/upload', file); } catch (err) { render(step, ''); return toast(err.message, { error: true }); }
     zone.hidden = true;
+    if (up.is_template) return renderTemplateImport(step, up, { close, onSaved: onTemplateSaved });
     // Sheet bulan terakhir (paling kiri di file manual) biasanya sudah berisi Januari s.d. bulan itu.
     render(step, html`
       <div class="toolbar mb-3">
